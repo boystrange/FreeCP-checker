@@ -46,10 +46,9 @@ import Control.Exception
   WAIT      { Token _ TokenWait }
   CLOSE     { Token _ TokenClose }
   CASE      { Token _ TokenCase }
-  FLIP      { Token _ TokenFlip }
+  SKIP      { Token _ TokenSkip }
   NEW       { Token _ TokenNew }
   IN        { Token _ TokenIn }
-  DUAL      { Token _ TokenDual }
   CID       { $$@(Token _ (TokenCID _)) }
   LID       { $$@(Token _ (TokenLID _)) }
   INT       { $$@(Token _ (TokenINT _)) }
@@ -74,14 +73,16 @@ import Control.Exception
   '--'      { Token _ TokenGet }
   '?'       { Token _ TokenQMark }
   '!'       { Token _ TokenEMark }
+  '^'       { Token _ TokenDual }
 
 %nonassoc '}' ']' IN
 
 %right ','
 %left '+'
+%right ';'
 %left '*' '|'
 %nonassoc '++' '--'
-%left ';'
+%nonassoc '?' '!'
 
 %%
 
@@ -180,6 +181,9 @@ ChannelName
 TypeName
   : CID { Identifier (At $ getPos $1) (getId $1) :: TypeName }
 
+PolyName
+  : LID { Identifier (At $ getPos $1) (getId $1) :: TypeName }
+
 ProcessName
   : CID { Identifier (At $ getPos $1) (getId $1) :: ProcessName }
 
@@ -190,16 +194,22 @@ Label
 
 TypeExpr
   : Type { Type $1 }
-  | DUAL Type { Dual $2 }
+  | '^' '(' Type ')' { Dual $3 }
 
 Type
   : Num  { if $1 == 1 then One
            else error $ (show $1) ++ " is not a type" }
   | '⊥'  { Bot }
   | TypeName { Var $1 }
+  | PolyName { Poly False $1 }
+  | '^' PolyName { Poly True $2 }
   | '(' Type ')' { $2 }
   | Type '*' Type { Mul $1 $3 }
   | Type '|' Type { Par $1 $3 }
+  | '!' Type { Mul $2 Skip }
+  | '?' Type { Par $2 Skip }
+  | SKIP { Skip }
+  | Type ';' Type { Seq $1 $3 }
   | '&' Branches { With $2 }
   | '+' Branches { Plus $2 }
   | '++' MeasureOpt Type { Put $2 $3 }

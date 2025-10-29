@@ -74,8 +74,7 @@ tokens :-
   "|"     { lex' TokenPar         }
   "?"     { lex' TokenQMark       }
   "!"     { lex' TokenEMark       }
-  "ᴸ"      { lex' TokenLow        }
-  "ᴴ"      { lex' TokenHigh       }
+  "^"     { lex' TokenDual        }
   "++"    { lex' TokenPut         }
   "--"    { lex' TokenGet         }
   @lid    { lex lookupLID         }
@@ -102,10 +101,9 @@ keywords = [("type",      TokenType),
             ("in",        TokenIn),
             ("new",       TokenNew),
             ("case",      TokenCase),
-            ("flip",      TokenFlip),
             ("close",     TokenClose),
             ("wait",      TokenWait),
-            ("dual",      TokenDual)]
+            ("skip",      TokenSkip)]
 
 lookupLID :: String -> TokenClass
 lookupLID s = case lookup s keywords of
@@ -124,7 +122,7 @@ data TokenClass
   | TokenClose
   | TokenWait
   | TokenCase
-  | TokenFlip
+  | TokenSkip
   | TokenDual
   | TokenLID String
   | TokenCID String
