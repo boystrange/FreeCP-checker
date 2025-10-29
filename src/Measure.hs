@@ -61,7 +61,7 @@ madd = MAdd
 msucc :: Measure -> Measure
 msucc = madd mone
 
-data Constraint
+data MeasureConstraint
   = CEq Measure Measure
   | CLe Measure Measure
   deriving (Eq, Ord)
@@ -83,7 +83,7 @@ instance MeasureVariables Measure where
   subst σ (MSub m n) = MSub (subst σ m) (subst σ n)
   subst σ (MMul w m) = MMul w (subst σ m)
 
-instance MeasureVariables Constraint where
+instance MeasureVariables MeasureConstraint where
   mv (CEq m n) = Set.union (mv m) (mv n)
   mv (CLe m n) = Set.union (mv m) (mv n)
   subst σ (CEq m n) = CEq (subst σ m) (subst σ n)
@@ -103,7 +103,7 @@ instance MeasureVariables a => MeasureVariables (Set a) where
 
 type MPartition = Partition MVar
 
-gatherSubstitutions :: [Constraint] -> (MSubst, [Constraint])
+gatherSubstitutions :: [MeasureConstraint] -> (MSubst, [MeasureConstraint])
 gatherSubstitutions = foldl aux (Partition.empty, [])
   where
     aux (σ, cs) (CEq (MRef μ) (MRef ν)) = (Partition.joinElems μ ν σ, cs)

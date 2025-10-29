@@ -45,15 +45,50 @@ import Type
 import Process
 import Exceptions
 
-checkTypeRel :: (Set Label -> Set Label -> Checker ()) ->
-                (Measure -> Measure -> Checker ()) ->
-                ChannelName -> TypeM -> TypeM -> Checker ()
-checkTypeRel tle mle x = aux []
-  where
-    aux :: [(TypeM, TypeM)] -> TypeM -> TypeM -> Checker ()
-    aux vs t s | (t, s) `elem` vs = return ()
-    aux vs t s = auxV ((t, s) : vs) (Type.unfold t) (Type.unfold s)
+type TypeContext = Map TypeName TypeM
+type Unifier = State (TypeContext, [MeasureConstraint])
+type ProcessContext = Map ProcessName (Measure, [TypeM])
+type Checker = State (ProcessContext, MVar, [MeasureConstraint])
 
+find :: TypeM -> Unifier TypeM
+find t@(Poly d tname) = do
+  (tmap, cs) <- State.get
+  case Map.lookup tname tmap of
+    Nothing -> return t
+    Just t  -> find (if d then dual t else t) 
+find t = return t
+
+addTypeConstraint :: TypeName -> TypeM -> Unifier ()
+addTypeConstraint tname t = undefined
+
+unify :: ProcessName -> [TypeM] -> [TypeM] -> Checker ()
+unify p ts ss = addConstraints (snd (State.execState (aux ts ss) ([], [])))
+  where
+    aux :: [TypeM] -> [TypeM] -> Unifier ()
+    aux ts ss = forM_ (zip ts ss) (uncurry (auxT []))
+
+    auxT :: [(TypeM, TypeM)] -> TypeM -> TypeM -> Unifier ()
+    auxT vs t s | (t, s) `elem` vs = return ()
+    auxT vs t s = do
+      tf <- find (Type.unfold t)
+      sf <- find (Type.unfold s)
+      auxV ((tf, sf) : vs) tf sf
+
+    -- unification for polymorphic variables
+    auxV vs (Poly False tname1) (Poly False tname2) | tname1 == tname2 = return ()
+    auxV vs t@(Poly False tname1) s@(Poly True tname2) | tname1 == tname2 = throw $ ErrorTypeRelation p t s
+    auxV vs t@(Poly _ tname1) s@(Poly _ tname2) | tname1 > tname2 = auxT vs s t
+    auxV vs (Poly False tname) t = addTypeConstraint tname t
+    auxV vs (Poly True tname) t = auxT vs (Type.dual t) (Poly False tname)
+    auxV vs t s@(Poly _ _) = auxT vs s t
+
+    -- unification for sequential composition
+    auxV vs Skip        Skip        = return ()
+    auxV vs (Seq t1 s1) (Seq t2 s2) = do
+      aux vs t1 t2
+      aux vs s1 s2
+
+    -- unification for regular constructors
     auxV vs One         One         = return ()
     auxV vs Bot         Bot         = return ()
     auxV vs (Par t1 s1) (Par t2 s2) = do
@@ -74,10 +109,11 @@ checkTypeRel tle mle x = aux []
       forM_ (Map.elems (zipMap m1 m2)) (uncurry (aux vs))
     auxV vs (Put m t) (Put n s) = do
       aux vs t s
-      mle n m
+      addMeasureConstraintEq n m
     auxV vs (Get m t) (Get n s) = do
       aux vs t s
-      mle m n
+      addMeasureConstraintEq m n
+    -- type mismatch
     auxV _ t s = throw $ ErrorTypeRelation x t s
 
 checkTypeSub :: ChannelName -> TypeM -> TypeM -> Checker ()
@@ -106,9 +142,6 @@ checkContextSub ctx1 ctx2 = do
 -- |A __context__ is a finite map from channel names to session types
 -- represented as regular trees.
 type Context = Map ChannelName TypeM
-type ProcessContext = Map ProcessName (Measure, [TypeM])
-
-type Checker = State (ProcessContext, MVar, [Constraint])
 
 newMeasureVar :: Checker MVar
 newMeasureVar = do
@@ -223,10 +256,13 @@ getConstraints = do
   State.put (penv, toEnum 0, [])
   return cs
 
-addConstraint :: Constraint -> Checker ()
+addConstraint :: MeasureConstraint -> Checker ()
 addConstraint c = do
   (penv, n, cs) <- State.get
   State.put (penv, n, c : cs)
+
+addConstraints :: [MeasureConstraint] -> Checker ()
+addConstraints = mapM_ addConstraint
 
 addConstraintEq :: Measure -> Measure -> Checker ()
 addConstraintEq m n | m == n = return ()
@@ -258,10 +294,10 @@ insert ctx x t =
 -- | Check that all process definitions are well typed. The first
 -- argument is the subtyping relation being used, so that it is
 -- possible to choose among fair and unfair subtyping.
-checkTypes :: Strategy -> [ProcessDefS] -> ([Constraint], [ProcessDef])
+checkTypes :: Strategy -> [ProcessDefS] -> ([MeasureConstraint], [ProcessDef])
 checkTypes strat pdefs = State.evalState (checkProgram pdefs) (Map.empty, toEnum 0, [])
   where
-    checkProgram :: [ProcessDefS] -> Checker ([Constraint], [ProcessDef])
+    checkProgram :: [ProcessDefS] -> Checker ([MeasureConstraint], [ProcessDef])
     checkProgram pdefs = do
       pdefs <- mapM (\(pname, xts, p) -> do
                         ctx <- addProcess pname xts
