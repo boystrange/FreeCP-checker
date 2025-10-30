@@ -102,8 +102,8 @@ instance Show MVar where
   show (MVar n) | major == 0 = [letters!!minor]
                 | otherwise  = letters!!minor : sub major
     where
-      letters = ['α'..]
-      max = 20
+      letters = ['κ', 'λ', 'μ', 'ν', 'ι']
+      max = length letters
       major = n `div` max
       minor = n `mod` max
 
@@ -130,6 +130,17 @@ prettyMeasure = annotate (PT.color PT.Green) . pretty . show
 
 prettyLabel :: Label -> Document
 prettyLabel = identifier . show
+
+-- TYPE VARIABLES
+
+instance Show TVar where
+  show (TVar n) | major == 0 = [letters!!minor]
+                | otherwise  = letters!!minor : sub major
+    where
+      letters = ['α'..'ε']
+      max = length letters
+      major = n `div` max
+      minor = n `mod` max
 
 -- TYPES
 

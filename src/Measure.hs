@@ -67,39 +67,39 @@ data MeasureConstraint
   deriving (Eq, Ord)
 
 class Ord a => MeasureVariables a where
-  mv :: a -> Set MVar
-  subst :: MSubst -> a -> a
+  mvars :: a -> Set MVar
+  msubst :: MSubst -> a -> a
 
 instance MeasureVariables Measure where
-  mv (MCon _) = Set.empty
-  mv (MRef x) = Set.singleton x
-  mv (MAdd m n) = Set.union (mv m) (mv n)
-  mv (MSub m n) = Set.union (mv m) (mv n)
-  mv (MMul w m) = mv m
+  mvars (MCon _) = Set.empty
+  mvars (MRef x) = Set.singleton x
+  mvars (MAdd m n) = Set.union (mvars m) (mvars n)
+  mvars (MSub m n) = Set.union (mvars m) (mvars n)
+  mvars (MMul w m) = mvars m
 
-  subst σ (MCon n) = MCon n
-  subst σ (MRef x) = MRef (Partition.rep σ x)
-  subst σ (MAdd m n) = MAdd (subst σ m) (subst σ n)
-  subst σ (MSub m n) = MSub (subst σ m) (subst σ n)
-  subst σ (MMul w m) = MMul w (subst σ m)
+  msubst σ (MCon n) = MCon n
+  msubst σ (MRef x) = MRef (Partition.rep σ x)
+  msubst σ (MAdd m n) = MAdd (msubst σ m) (msubst σ n)
+  msubst σ (MSub m n) = MSub (msubst σ m) (msubst σ n)
+  msubst σ (MMul w m) = MMul w (msubst σ m)
 
 instance MeasureVariables MeasureConstraint where
-  mv (CEq m n) = Set.union (mv m) (mv n)
-  mv (CLe m n) = Set.union (mv m) (mv n)
-  subst σ (CEq m n) = CEq (subst σ m) (subst σ n)
-  subst σ (CLe m n) = CLe (subst σ m) (subst σ n)
+  mvars (CEq m n) = Set.union (mvars m) (mvars n)
+  mvars (CLe m n) = Set.union (mvars m) (mvars n)
+  msubst σ (CEq m n) = CEq (msubst σ m) (msubst σ n)
+  msubst σ (CLe m n) = CLe (msubst σ m) (msubst σ n)
 
 instance (MeasureVariables a, MeasureVariables b) => MeasureVariables (a, b) where
-  mv (x, y) = Set.union (mv x) (mv y)
-  subst σ (x, y) = (subst σ x, subst σ y)
+  mvars (x, y) = Set.union (mvars x) (mvars y)
+  msubst σ (x, y) = (msubst σ x, msubst σ y)
 
 instance MeasureVariables a => MeasureVariables [a] where
-  mv = Set.unions . map mv
-  subst = map . subst
+  mvars = Set.unions . map mvars
+  msubst = map . msubst
 
 instance MeasureVariables a => MeasureVariables (Set a) where
-  mv = Set.unions . Set.elems . Set.map mv
-  subst = Set.map . subst
+  mvars = Set.unions . Set.elems . Set.map mvars
+  msubst = Set.map . msubst
 
 type MPartition = Partition MVar
 

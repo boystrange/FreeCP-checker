@@ -48,7 +48,7 @@ resolveT tdefs = aux []
       case lookup tname tdefs of
         Nothing -> throw (ErrorUnknownIdentifier "type" (showWithPos tname))
         Just t  -> let s = aux (tname : tnames) t in
-                     if Set.member (RecVar tname) (fv s) then
+                     if Set.member (RecVar tname) (tvars s) then
                        Rec tname s
                      else
                        s

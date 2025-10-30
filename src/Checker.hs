@@ -46,28 +46,36 @@ import Process
 import Exceptions
 
 type TypeContext = Map TypeName TypeM
-type Unifier = State (TypeContext, [MeasureConstraint])
 type ProcessContext = Map ProcessName (Measure, [TypeM])
-type Checker = State (ProcessContext, MVar, [MeasureConstraint])
+type Checker = State (ProcessContext, TVar, MVar, TypeContext, [MeasureConstraint])
 
-find :: TypeM -> Unifier TypeM
+find :: TypeM -> Checker TypeM
 find t@(Poly d tname) = do
-  (tmap, cs) <- State.get
+  (_, _, _, tmap, _) <- State.get
   case Map.lookup tname tmap of
     Nothing -> return t
     Just t  -> find (if d then dual t else t) 
 find t = return t
 
-addTypeConstraint :: TypeName -> TypeM -> Unifier ()
-addTypeConstraint tname t = undefined
+instantiate :: [TypeM] -> Checker [TypeM]
+instantiate ts = do
+  let vs = Set.toList (tvars ts)
+  ss <- mapM (const newTypeVar) vs
+  let tmap = Map.fromList (zip vs ss)
+  return (map (substs tmap) ts)
+
+addTypeConstraint :: TypeName -> TypeM -> Checker ()
+addTypeConstraint tname t = do
+  (pctxt, tv, mv, tmap, cs) <- State.get
+  State.put (pctxt, tv, mv, Map.insert tname t tmap, cs)
 
 unify :: [(ChannelName, TypeM, TypeM)] -> Checker ()
-unify xs = addMeasureConstraints (snd (State.execState (forM_ xs aux) ([], [])))
+unify = mapM_ aux
   where
-    aux :: (ChannelName, TypeM, TypeM) -> Unifier ()
+    aux :: (ChannelName, TypeM, TypeM) -> Checker ()
     aux (name, t, s) = auxT [] t s
       where
-        auxT :: [(TypeM, TypeM)] -> TypeM -> TypeM -> Unifier ()
+        auxT :: [(TypeM, TypeM)] -> TypeM -> TypeM -> Checker ()
         auxT vs t s | (t, s) `elem` vs = return ()
         auxT vs t s = do
           tf <- find (Type.unfold t)
@@ -76,7 +84,7 @@ unify xs = addMeasureConstraints (snd (State.execState (forM_ xs aux) ([], [])))
 
         -- unification for polymorphic variables
         auxV vs (Poly False tname1) (Poly False tname2) | tname1 == tname2 = return ()
-        auxV vs t@(Poly False tname) s | Set.member tname (Type.fv s) = throw $ ErrorTypeMismatch name t s
+        auxV vs t@(Poly False tname) s | Set.member (PolyVar tname) (tvars s) = throw $ ErrorTypeMismatch name (show t) s
         auxV vs t@(Poly _ tname1) s@(Poly _ tname2) | tname1 > tname2 = auxT vs s t
         auxV vs (Poly False tname) t = addTypeConstraint tname t
         auxV vs (Poly True tname) t = auxT vs (Type.dual t) (Poly False tname)
@@ -85,33 +93,33 @@ unify xs = addMeasureConstraints (snd (State.execState (forM_ xs aux) ([], [])))
         -- unification for sequential composition
         auxV vs Skip        Skip        = return ()
         auxV vs (Seq t1 s1) (Seq t2 s2) = do
-          aux vs t1 t2
-          aux vs s1 s2
+          auxT vs t1 t2
+          auxT vs s1 s2
 
         -- unification for regular constructors
         auxV vs One         One         = return ()
         auxV vs Bot         Bot         = return ()
         auxV vs (Par t1 s1) (Par t2 s2) = do
-          aux vs t1 t2
-          aux vs s1 s2
+          auxT vs t1 t2
+          auxT vs s1 s2
         auxV vs (Mul t1 s1) (Mul t2 s2) = do
-          aux vs t1 t2
-          aux vs s1 s2
+          auxT vs t1 t2
+          auxT vs s1 s2
         auxV vs (With bs1) (With bs2) = do
           let m1 = Map.fromList bs1
           let m2 = Map.fromList bs2
           tle (Map.keysSet m2) (Map.keysSet m1)
-          forM_ (Map.elems (zipMap m1 m2)) (uncurry (aux vs))
+          forM_ (Map.elems (zipMap m1 m2)) (uncurry (auxT vs))
         auxV vs (Plus bs1) (Plus bs2) = do
           let m1 = Map.fromList bs1
           let m2 = Map.fromList bs2
           tle (Map.keysSet m1) (Map.keysSet m2)
-          forM_ (Map.elems (zipMap m1 m2)) (uncurry (aux vs))
+          forM_ (Map.elems (zipMap m1 m2)) (uncurry (auxT vs))
         auxV vs (Put m t) (Put n s) = do
-          aux vs t s
+          auxT vs t s
           addMeasureConstraintEq n m
         auxV vs (Get m t) (Get n s) = do
-          aux vs t s
+          auxT vs t s
           addMeasureConstraintEq m n
         -- type mismatch
         auxV _ t s = throw $ ErrorTypeMismatch name (show t) s
@@ -136,10 +144,16 @@ checkContextSub ctx1 ctx2 = do
 -- represented as regular trees.
 type Context = Map ChannelName TypeM
 
+newTypeVar :: Checker TypeM
+newTypeVar = do
+  (penv, n, m, tmap, cs) <- State.get
+  State.put (penv, succ n, m, tmap, cs)
+  return (Poly False (Identifier Somewhere (show n)))
+
 newMeasureVar :: Checker MVar
 newMeasureVar = do
-  (penv, μ, cs) <- State.get
-  State.put (penv, succ μ, cs)
+  (penv, n, μ, tmap, cs) <- State.get
+  State.put (penv, n, succ μ, tmap, cs)
   return μ
 
 annotateType :: TypeS -> Checker TypeM
@@ -223,20 +237,22 @@ annotateProcess = go
 
 getProcess :: ProcessName -> Checker (Measure, [TypeM])
 getProcess pname = do
-  (penv, _, _) <- State.get
+  (penv, _, _, _, _) <- State.get
   case Map.lookup pname penv of
     Nothing -> throw $ ErrorUnknownIdentifier "process" (showWithPos pname)
-    Just pd -> return pd
+    Just (m, ts) -> do
+      ss <- instantiate ts
+      return (m, ss)
 
 setProcess :: ProcessName -> Measure -> [TypeM] -> Checker ()
 setProcess pname m ts = do
-  (penv, μ', cs') <- State.get
+  (penv, n, μ', tmap, cs') <- State.get
   let penv' = Map.insert pname (m, ts) penv
-  State.put (penv', μ', cs')
+  State.put (penv', n, μ', tmap, cs')
 
 addProcess :: ProcessName -> [(ChannelName, TypeS)] -> Checker Context
 addProcess pname xts = do
-  (penv, _, _) <- State.get
+  (penv, _, _, _, _) <- State.get
   unless (not (Map.member pname penv)) $ throw $ ErrorMultipleProcessDefinitions pname
   μ <- MRef <$> newMeasureVar
   ts <- mapM (annotateType . snd) xts
@@ -245,14 +261,14 @@ addProcess pname xts = do
 
 getMeasureConstraints :: Checker [MeasureConstraint]
 getMeasureConstraints = do
-  (penv, μ, cs) <- State.get
-  State.put (penv, toEnum 0, [])
+  (penv, m, μ, tmap, cs) <- State.get
+  State.put (penv, m, toEnum 0, tmap, [])
   return cs
 
 addMeasureConstraint :: MeasureConstraint -> Checker ()
 addMeasureConstraint c = do
-  (penv, n, cs) <- State.get
-  State.put (penv, n, c : cs)
+  (penv, m, n, tmap, cs) <- State.get
+  State.put (penv, m, n, tmap, c : cs)
 
 addMeasureConstraints :: [MeasureConstraint] -> Checker ()
 addMeasureConstraints = mapM_ addMeasureConstraint
@@ -288,7 +304,7 @@ insert ctx x t =
 -- argument is the subtyping relation being used, so that it is
 -- possible to choose among fair and unfair subtyping.
 checkTypes :: Strategy -> [ProcessDefS] -> ([MeasureConstraint], [ProcessDef])
-checkTypes strat pdefs = State.evalState (checkProgram pdefs) (Map.empty, toEnum 0, [])
+checkTypes strat pdefs = State.evalState (checkProgram pdefs) (Map.empty, toEnum 0, toEnum 0, Map.empty, [])
   where
     checkProgram :: [ProcessDefS] -> Checker ([MeasureConstraint], [ProcessDef])
     checkProgram pdefs = do
@@ -302,7 +318,7 @@ checkTypes strat pdefs = State.evalState (checkProgram pdefs) (Map.empty, toEnum
                         addMeasureConstraintLe ν μ
                         return (pname, μ, zip (map fst xts) ts, p')
                     ) pdefs
-      (_, _, cs) <- State.get
+      (_, _, _, _, cs) <- State.get
       return (cs, pdefs)
 
     -- Check that the context is empty. If not, there are some

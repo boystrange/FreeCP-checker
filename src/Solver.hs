@@ -69,7 +69,7 @@ type MyBounds = Bounds () MVar R.IntDouble
 
 type Solution = Map MVar Double
 
-solve :: [MVar] -> [Measure.Constraint] -> Maybe Solution
+solve :: [MVar] -> [Measure.MeasureConstraint] -> Maybe Solution
 solve μs cs =
   case limp program of
     Nothing -> Nothing

@@ -28,11 +28,24 @@ import Atoms
 import Measure
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.Map (Map)
+import qualified Data.Map as Map
 import Data.List (sort)
 import Control.Monad (forM_)
 
 data TypeVariable = PolyVar TypeName | RecVar TypeName
   deriving (Eq, Ord)
+
+class Ord a => TypeVariables a where
+  tvars :: a -> Set TypeVariable
+  tsubst :: TypeVariable -> a -> a -> a
+
+data TVar = TVar Int
+  deriving (Eq, Ord)
+
+instance Enum TVar where
+  toEnum = TVar
+  fromEnum (TVar n) = n
 
 -- |Session type representation. In addition to the forms described in the
 -- paper, we also provide a 'Rec' constructor to represent recursive session
@@ -106,42 +119,44 @@ wf t = case aux [] t of
     aux us (Put _ t) = aux us t
     aux us (Get _ t) = aux us t
 
--- |Compute the sets of free type variables of a type. The first component is
--- the set of variables used for recursion. The second component is the set of
--- polymorphic type variables.
-fv :: Type m -> Set TypeVariable
-fv (Poly _ tname) = Set.singleton (PolyVar tname)
-fv (Var tname)    = Set.singleton (RecVar tname)
-fv (Rec tname t)  = Set.delete (RecVar tname) (fv t)
-fv (Par t s)      = Set.union (fv t) (fv s)
-fv (Mul t s)      = Set.union (fv t) (fv s)
-fv (With bs)      = Set.unions (map (fv . snd) bs)
-fv (Plus bs)      = Set.unions (map (fv . snd) bs)
-fv (Put _ t)      = fv t
-fv (Get _ t)      = fv t
-fv (Seq t s)      = Set.union (fv t) (fv s)
-fv _              = Set.empty
+instance Ord a => TypeVariables (Type a) where
+  tvars (Poly _ tname) = Set.singleton (PolyVar tname)
+  tvars (Var tname)    = Set.singleton (RecVar tname)
+  tvars (Rec tname t)  = Set.delete (RecVar tname) (tvars t)
+  tvars (Par t s)      = Set.union (tvars t) (tvars s)
+  tvars (Mul t s)      = Set.union (tvars t) (tvars s)
+  tvars (With bs)      = Set.unions (map (tvars . snd) bs)
+  tvars (Plus bs)      = Set.unions (map (tvars . snd) bs)
+  tvars (Put _ t)      = tvars t
+  tvars (Get _ t)      = tvars t
+  tvars (Seq t s)      = Set.union (tvars t) (tvars s)
+  tvars _              = Set.empty
 
-substT :: TypeVariable -> Type m -> Type m -> Type m
-substT tname t = aux
-  where
-    aux (Seq t1 t2)    = Seq (aux t1) (aux t2)
-    aux (Par t1 t2)    = Par (aux t1) (aux t2)
-    aux (Mul t1 t2)    = Mul (aux t1) (aux t2)
-    aux (Plus bs)      = Plus (mapSnd aux bs)
-    aux (With bs)      = With (mapSnd aux bs)
-    aux (Put m t)      = Put m (aux t)
-    aux (Get m t)      = Get m (aux t)
-    aux (Poly d sname) | tname == PolyVar sname = (if d then dual else id) t
-    aux (Var sname)    | tname == RecVar sname  = t
-    aux (Rec sname s)  | tname /= RecVar sname  = Rec sname (aux s)
-    aux s = s
+  tsubst tname t = substs (Map.singleton tname t)
 
-unfold :: Type m -> Type m
-unfold t@(Rec tname s) = substT (RecVar tname) t s
+instance TypeVariables a => TypeVariables [a] where
+  tvars = undefined
+
+  tsubst = undefined
+
+substs :: Map TypeVariable (Type m) -> Type m -> Type m
+substs tmap (Seq t1 t2)    = Seq (substs tmap t1) (substs tmap t2)
+substs tmap (Par t1 t2)    = Par (substs tmap t1) (substs tmap t2)
+substs tmap (Mul t1 t2)    = Mul (substs tmap t1) (substs tmap t2)
+substs tmap (Plus bs)      = Plus (mapSnd (substs tmap) bs)
+substs tmap (With bs)      = With (mapSnd (substs tmap) bs)
+substs tmap (Put m t)      = Put m (substs tmap t)
+substs tmap (Get m t)      = Get m (substs tmap t)
+substs tmap (Poly d sname) | Just t <- Map.lookup (PolyVar sname) tmap = if d then dual t else t
+substs tmap (Var sname)    | Just t <- Map.lookup (RecVar sname) tmap = t
+substs tmap (Rec sname s)  = Rec sname (substs (Map.delete (RecVar sname) tmap) s)
+substs tmap s = s
+
+unfold :: Ord m => Type m -> Type m
+unfold t@(Rec tname s) = tsubst (RecVar tname) t s
 unfold t = t
 
-hnf :: Type m -> Type m
+hnf :: Ord m => Type m -> Type m
 hnf t =
   case unfold t of
     Seq t1 t2 ->
@@ -195,17 +210,17 @@ instance Functor Type where
   fmap f (Get m t) = Get (f m) (fmap f t)
 
 instance MeasureVariables t => MeasureVariables (Type t) where
-  mv Skip = Set.empty
-  mv (Seq t s) = Set.union (mv t) (mv s)
-  mv (Poly _ tname) = Set.empty
-  mv (Var tname) = Set.empty
-  mv (Rec tname t) = mv t
-  mv One = Set.empty
-  mv Bot = Set.empty
-  mv (Par t s) = Set.union (mv t) (mv s)
-  mv (Mul t s) = Set.union (mv t) (mv s)
-  mv (With bs) = Set.unions (map (mv . snd) bs)
-  mv (Plus bs) = Set.unions (map (mv . snd) bs)
-  mv (Put m t) = Set.union (mv m) (mv t)
-  mv (Get m t) = Set.union (mv m) (mv t)
-  subst = fmap . subst
+  mvars Skip = Set.empty
+  mvars (Seq t s) = Set.union (mvars t) (mvars s)
+  mvars (Poly _ tname) = Set.empty
+  mvars (Var tname) = Set.empty
+  mvars (Rec tname t) = mvars t
+  mvars One = Set.empty
+  mvars Bot = Set.empty
+  mvars (Par t s) = Set.union (mvars t) (mvars s)
+  mvars (Mul t s) = Set.union (mvars t) (mvars s)
+  mvars (With bs) = Set.unions (map (mvars . snd) bs)
+  mvars (Plus bs) = Set.unions (map (mvars . snd) bs)
+  mvars (Put m t) = Set.union (mvars m) (mvars t)
+  mvars (Get m t) = Set.union (mvars m) (mvars t)
+  msubst = fmap . msubst

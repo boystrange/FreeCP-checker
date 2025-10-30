@@ -90,7 +90,7 @@ main = do
       forM_ pdefs' printProcessDec
       when verbose (forM_ cs (\c -> putStrLn $ "  " ++ show c))
       when True
-        (do let μs = Set.toList (mv cs)
+        (do let μs = Set.toList (mvars cs)
             case Solver.solve μs cs of
               Nothing -> printNO "termination checker"
               Just μmap -> do printSolution μmap

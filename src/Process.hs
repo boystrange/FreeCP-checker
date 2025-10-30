@@ -110,4 +110,4 @@ instance Functor Process where
   fmap f (GetGas x p) = GetGas x (fmap f p)
 
 substProcessDef :: MSubst -> ProcessDef -> ProcessDef
-substProcessDef σ (pname, μ, xts, p) = (pname, subst σ μ, mapSnd (subst σ) xts, fmap (subst σ) p)
+substProcessDef σ (pname, μ, xts, p) = (pname, msubst σ μ, mapSnd (msubst σ) xts, fmap (msubst σ) p)
