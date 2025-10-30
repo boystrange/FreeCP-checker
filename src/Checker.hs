@@ -61,74 +61,67 @@ find t = return t
 addTypeConstraint :: TypeName -> TypeM -> Unifier ()
 addTypeConstraint tname t = undefined
 
-unify :: ProcessName -> [TypeM] -> [TypeM] -> Checker ()
-unify p ts ss = addConstraints (snd (State.execState (aux ts ss) ([], [])))
+unify :: [(ChannelName, TypeM, TypeM)] -> Checker ()
+unify xs = addMeasureConstraints (snd (State.execState (forM_ xs aux) ([], [])))
   where
-    aux :: [TypeM] -> [TypeM] -> Unifier ()
-    aux ts ss = forM_ (zip ts ss) (uncurry (auxT []))
+    aux :: (ChannelName, TypeM, TypeM) -> Unifier ()
+    aux (name, t, s) = auxT [] t s
+      where
+        auxT :: [(TypeM, TypeM)] -> TypeM -> TypeM -> Unifier ()
+        auxT vs t s | (t, s) `elem` vs = return ()
+        auxT vs t s = do
+          tf <- find (Type.unfold t)
+          sf <- find (Type.unfold s)
+          auxV ((tf, sf) : vs) tf sf
 
-    auxT :: [(TypeM, TypeM)] -> TypeM -> TypeM -> Unifier ()
-    auxT vs t s | (t, s) `elem` vs = return ()
-    auxT vs t s = do
-      tf <- find (Type.unfold t)
-      sf <- find (Type.unfold s)
-      auxV ((tf, sf) : vs) tf sf
+        -- unification for polymorphic variables
+        auxV vs (Poly False tname1) (Poly False tname2) | tname1 == tname2 = return ()
+        auxV vs t@(Poly False tname) s | Set.member tname (Type.fv s) = throw $ ErrorTypeMismatch name t s
+        auxV vs t@(Poly _ tname1) s@(Poly _ tname2) | tname1 > tname2 = auxT vs s t
+        auxV vs (Poly False tname) t = addTypeConstraint tname t
+        auxV vs (Poly True tname) t = auxT vs (Type.dual t) (Poly False tname)
+        auxV vs t s@(Poly _ _) = auxT vs s t
 
-    -- unification for polymorphic variables
-    auxV vs (Poly False tname1) (Poly False tname2) | tname1 == tname2 = return ()
-    auxV vs t@(Poly False tname1) s@(Poly True tname2) | tname1 == tname2 = throw $ ErrorTypeRelation p t s
-    auxV vs t@(Poly _ tname1) s@(Poly _ tname2) | tname1 > tname2 = auxT vs s t
-    auxV vs (Poly False tname) t = addTypeConstraint tname t
-    auxV vs (Poly True tname) t = auxT vs (Type.dual t) (Poly False tname)
-    auxV vs t s@(Poly _ _) = auxT vs s t
+        -- unification for sequential composition
+        auxV vs Skip        Skip        = return ()
+        auxV vs (Seq t1 s1) (Seq t2 s2) = do
+          aux vs t1 t2
+          aux vs s1 s2
 
-    -- unification for sequential composition
-    auxV vs Skip        Skip        = return ()
-    auxV vs (Seq t1 s1) (Seq t2 s2) = do
-      aux vs t1 t2
-      aux vs s1 s2
+        -- unification for regular constructors
+        auxV vs One         One         = return ()
+        auxV vs Bot         Bot         = return ()
+        auxV vs (Par t1 s1) (Par t2 s2) = do
+          aux vs t1 t2
+          aux vs s1 s2
+        auxV vs (Mul t1 s1) (Mul t2 s2) = do
+          aux vs t1 t2
+          aux vs s1 s2
+        auxV vs (With bs1) (With bs2) = do
+          let m1 = Map.fromList bs1
+          let m2 = Map.fromList bs2
+          tle (Map.keysSet m2) (Map.keysSet m1)
+          forM_ (Map.elems (zipMap m1 m2)) (uncurry (aux vs))
+        auxV vs (Plus bs1) (Plus bs2) = do
+          let m1 = Map.fromList bs1
+          let m2 = Map.fromList bs2
+          tle (Map.keysSet m1) (Map.keysSet m2)
+          forM_ (Map.elems (zipMap m1 m2)) (uncurry (aux vs))
+        auxV vs (Put m t) (Put n s) = do
+          aux vs t s
+          addMeasureConstraintEq n m
+        auxV vs (Get m t) (Get n s) = do
+          aux vs t s
+          addMeasureConstraintEq m n
+        -- type mismatch
+        auxV _ t s = throw $ ErrorTypeMismatch name (show t) s
 
-    -- unification for regular constructors
-    auxV vs One         One         = return ()
-    auxV vs Bot         Bot         = return ()
-    auxV vs (Par t1 s1) (Par t2 s2) = do
-      aux vs t1 t2
-      aux vs s1 s2
-    auxV vs (Mul t1 s1) (Mul t2 s2) = do
-      aux vs t1 t2
-      aux vs s1 s2
-    auxV vs (With bs1) (With bs2) = do
-      let m1 = Map.fromList bs1
-      let m2 = Map.fromList bs2
-      tle (Map.keysSet m2) (Map.keysSet m1)
-      forM_ (Map.elems (zipMap m1 m2)) (uncurry (aux vs))
-    auxV vs (Plus bs1) (Plus bs2) = do
-      let m1 = Map.fromList bs1
-      let m2 = Map.fromList bs2
-      tle (Map.keysSet m1) (Map.keysSet m2)
-      forM_ (Map.elems (zipMap m1 m2)) (uncurry (aux vs))
-    auxV vs (Put m t) (Put n s) = do
-      aux vs t s
-      addMeasureConstraintEq n m
-    auxV vs (Get m t) (Get n s) = do
-      aux vs t s
-      addMeasureConstraintEq m n
-    -- type mismatch
-    auxV _ t s = throw $ ErrorTypeRelation x t s
-
-checkTypeSub :: ChannelName -> TypeM -> TypeM -> Checker ()
-checkTypeSub x = checkTypeRel tle addConstraintLe x
-  where
-    tle tags1 tags2 =
-      unless (tags1 `Set.isSubsetOf` tags2) $
-        throw $ ErrorLabelMismatch x (Set.elems tags1) (Set.elems tags2)
+        tle tags1 tags2 =
+          unless (tags1 == tags2) $
+            throw $ ErrorLabelMismatch name (Set.elems tags1) (Set.elems tags2)
 
 checkTypeEq :: ChannelName -> TypeM -> TypeM -> Checker ()
-checkTypeEq x = checkTypeRel tle addConstraintEq x
-  where
-    tle tags1 tags2 =
-      unless (tags1 == tags2) $
-        throw $ ErrorLabelMismatch x (Set.elems tags1) (Set.elems tags2)
+checkTypeEq x t s = unify [(x, t, s)]
 
 checkContextSub :: Context -> Context -> Checker ()
 checkContextSub ctx1 ctx2 = do
@@ -250,27 +243,27 @@ addProcess pname xts = do
   setProcess pname μ ts
   return $ Map.fromList (zip (map fst xts) ts)
 
-getConstraints :: Checker [Constraint]
-getConstraints = do
+getMeasureConstraints :: Checker [MeasureConstraint]
+getMeasureConstraints = do
   (penv, μ, cs) <- State.get
   State.put (penv, toEnum 0, [])
   return cs
 
-addConstraint :: MeasureConstraint -> Checker ()
-addConstraint c = do
+addMeasureConstraint :: MeasureConstraint -> Checker ()
+addMeasureConstraint c = do
   (penv, n, cs) <- State.get
   State.put (penv, n, c : cs)
 
-addConstraints :: [MeasureConstraint] -> Checker ()
-addConstraints = mapM_ addConstraint
+addMeasureConstraints :: [MeasureConstraint] -> Checker ()
+addMeasureConstraints = mapM_ addMeasureConstraint
 
-addConstraintEq :: Measure -> Measure -> Checker ()
-addConstraintEq m n | m == n = return ()
-                    | otherwise = addConstraint (CEq m n)
+addMeasureConstraintEq :: Measure -> Measure -> Checker ()
+addMeasureConstraintEq m n | m == n = return ()
+                           | otherwise = addMeasureConstraint (CEq m n)
 
-addConstraintLe :: Measure -> Measure -> Checker ()
-addConstraintLe m n | m == n = return ()
-                    | otherwise = addConstraint (CLe m n)
+addMeasureConstraintLe :: Measure -> Measure -> Checker ()
+addMeasureConstraintLe m n | m == n = return ()
+                           | otherwise = addMeasureConstraint (CLe m n)
 
 peek :: Context -> ChannelName -> Checker TypeM
 peek ctx x =
@@ -306,7 +299,7 @@ checkTypes strat pdefs = State.evalState (checkProgram pdefs) (Map.empty, toEnum
       pdefs <- mapM (\(pname, xts, ctx, p) -> do
                         (p', ν) <- annotateProcess p >>= auxP ctx
                         (μ, ts) <- getProcess pname
-                        addConstraintLe ν μ
+                        addMeasureConstraintLe ν μ
                         return (pname, μ, zip (map fst xts) ts, p')
                     ) pdefs
       (_, _, cs) <- State.get
@@ -437,7 +430,7 @@ checkTypes strat pdefs = State.evalState (checkProgram pdefs) (Map.empty, toEnum
             \(tag, (si, pi)) -> do
               ctx <- insert ctx x si
               (pi', μi) <- auxP ctx pi
-              addConstraintLe μi μ
+              addMeasureConstraintLe μi μ
               return (tag, pi')
           return (Case x tps, μ)
         -- In all the other cases the type is just the wrong one
@@ -458,7 +451,7 @@ checkTypes strat pdefs = State.evalState (checkProgram pdefs) (Map.empty, toEnum
         Type.Get ν s -> do
           ctx <- insert ctx x s
           (p', μ) <- auxP ctx p
-          addConstraintLe ν μ
+          addMeasureConstraintLe ν μ
           return (GetGas x p', MSub μ ν)
         _ -> throw $ ErrorTypeMismatch x "--" t
     -- Rule [cut]

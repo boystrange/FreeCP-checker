@@ -42,8 +42,7 @@ data MyException
   | ErrorSessionUnbounded ProcessName ChannelName
   | ErrorTypeUnbounded ChannelName
   | ErrorTypeNonContractive TypeName
-  | ErrorTypeMismatch ChannelName String (Type Measure)
-  | ErrorTypeRelation ChannelName TypeM TypeM
+  | ErrorTypeMismatch ChannelName String TypeM
   | ErrorArityMismatch ProcessName Int Int
   | ErrorLabelMismatch ChannelName [Label] [Label]
   | ErrorInvalidType String
@@ -69,10 +68,9 @@ instance Show MyException where
   show (ErrorSessionUnbounded pname name) = "session-unbounded process: " ++ showWithPos pname ++ " creates " ++ showWithPos name
   show (ErrorCastUnbounded pname name) = "cast-unbounded process: " ++ showWithPos pname ++ " casts " ++ showWithPos name
   show (ErrorLinearity pnames) = "linearity violation: " ++ List.intercalate ", " (map showWithPos pnames)
-  show (ErrorLabelMismatch name elabels alabels) = "labels mismatch for " ++ showWithPos name ++ ": expected " ++ show elabels ++ ", actual " ++ show alabels
+  show (ErrorLabelMismatch name elabels alabels) = "labels mismatch: " ++ showWithPos name ++ ": expected " ++ show elabels ++ ", actual " ++ show alabels
   show (ErrorTypeUnbounded name) = "unbounded type: " ++ showWithPos name
   show (ErrorTypeNonContractive tname) = "non-contractive type: " ++ showWithPos tname
   show (ErrorRuntime msg) = "runtime error: " ++ msg
   show (ErrorSecurity msg) = "security error: " ++ msg
-  show (ErrorTypeRelation name t s) = "type mismatch: " ++ showWithPos name ++ ": " ++ show t ++ " != " ++ show s
   show ErrorGeneric = "generic error"

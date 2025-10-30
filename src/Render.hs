@@ -119,7 +119,7 @@ instance Show Measure where
   show (MAdd m n) = show m ++ " + " ++ show n
   show (MSub m n) = show m ++ " - " ++ if atom n then show n else "(" ++ show n ++ ")"
 
-instance Show Constraint where
+instance Show MeasureConstraint where
   show (CEq m n) = show m ++ " == " ++ show n
   show (CLe m n) = show m ++ " <= " ++ show n
 
