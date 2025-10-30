@@ -43,6 +43,7 @@ resolveT tdefs = aux []
     aux :: [TypeName] -> TypeS -> TypeS
     aux tnames One  = One
     aux tnames Bot  = Bot
+    aux tnames (Poly d tname) = Poly d tname
     aux tnames (Var tname) | tname `elem` tnames = Var tname
     aux tnames (Var tname) =
       case lookup tname tdefs of
