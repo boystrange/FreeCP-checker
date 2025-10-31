@@ -159,9 +159,15 @@ newMeasureVar = do
 annotateType :: TypeS -> Checker TypeM
 annotateType = aux
   where
+    aux (Poly d tname) = return $ Poly d tname
     aux (Var tname) = return $ Var tname
     aux One = return One
     aux Bot = return Bot
+    aux Skip = return Skip
+    aux (Seq t s) = do
+      t' <- aux t
+      s' <- aux s
+      return $ Seq t' s'
     aux (Rec tname t) = do
       t' <- aux t
       return $ Rec tname t'
@@ -362,7 +368,7 @@ checkTypes strat pdefs = State.evalState (checkProgram pdefs) (Map.empty, toEnum
       -- Remove the association for x from the context.
       (ctx, t) <- remove ctx x
       -- Make sure that the type of x is ?end
-      checkTypeEq x Type.Bot t
+      checkTypeEq x Type.Bot (Type.hnf t)
       -- Type check the continuation.
       (p', μ) <- auxP ctx p
       return (Wait x p', μ)
@@ -373,7 +379,7 @@ checkTypes strat pdefs = State.evalState (checkProgram pdefs) (Map.empty, toEnum
       -- Make sure that the remaining context is empty.
       checkEmpty ctx
       -- Make sure that the type of x is !end
-      checkTypeEq x Type.One t
+      checkTypeEq x Type.One (Type.hnf t)
       μ <- MRef <$> newMeasureVar
       return (Close x, mclose strat μ)
     -- Rule [#]
@@ -383,7 +389,7 @@ checkTypes strat pdefs = State.evalState (checkProgram pdefs) (Map.empty, toEnum
       -- Remove the association for x from the context.
       (ctx, t) <- remove ctx x
       -- Check the shape of the type of x.
-      case Type.unfold t of
+      case Type.hnf t of
         -- If it is the input of a channel, insert the association
         -- for y in the context along with the updated type of x and
         -- type check the continuation.
@@ -400,7 +406,7 @@ checkTypes strat pdefs = State.evalState (checkProgram pdefs) (Map.empty, toEnum
       (ctx, t) <- remove ctx x
       let (ctxp, ctxq) = partitionContext ctx p q
       -- Check the shape of the type associated with x.
-      case Type.unfold t of
+      case Type.hnf t of
         -- If it is the output of a channel...
         Type.Mul s t' -> do
           ctxp <- insert ctxp y s
@@ -414,7 +420,7 @@ checkTypes strat pdefs = State.evalState (checkProgram pdefs) (Map.empty, toEnum
     -- Rule [⊕]
     auxP ctx (Select x tag p) = do
       (ctx, t) <- remove ctx x
-      case Type.unfold t of
+      case Type.hnf t of
         Type.Plus bs -> do
           case lookup tag bs of
             Just sk -> do
@@ -429,7 +435,7 @@ checkTypes strat pdefs = State.evalState (checkProgram pdefs) (Map.empty, toEnum
       -- Remove the association for x from the context.
       (ctx, t) <- remove ctx x
       -- Check the shape of the type associated with x.
-      case Type.unfold t of
+      case Type.hnf t of
         -- If it is a "with"...
         Type.With bs -> do
           let tmap = Map.fromList bs
@@ -454,7 +460,7 @@ checkTypes strat pdefs = State.evalState (checkProgram pdefs) (Map.empty, toEnum
     -- Rule [put]
     auxP ctx (PutGas x p) = do
       (ctx, t) <- remove ctx x
-      case Type.unfold t of
+      case Type.hnf t of
         Type.Put ν s -> do
           ctx <- insert ctx x s
           (p', μ) <- auxP ctx p
@@ -463,7 +469,7 @@ checkTypes strat pdefs = State.evalState (checkProgram pdefs) (Map.empty, toEnum
     -- Rule [get]
     auxP ctx (GetGas x p) = do
       (ctx, t) <- remove ctx x
-      case Type.unfold t of
+      case Type.hnf t of
         Type.Get ν s -> do
           ctx <- insert ctx x s
           (p', μ) <- auxP ctx p

@@ -69,8 +69,11 @@ tokens :-
   "="     { lex' TokenEQ          }
   "⊥"     { lex' TokenBot         }
   "&"     { lex' TokenAmp         }
+  "⊕"     { lex' TokenPlus        }
   "+"     { lex' TokenPlus        }
   "*"     { lex' TokenTimes       }
+  "⊗"     { lex' TokenTimes       }
+  "⅋"     { lex' TokenPar         }
   "|"     { lex' TokenPar         }
   "?"     { lex' TokenQMark       }
   "!"     { lex' TokenEMark       }

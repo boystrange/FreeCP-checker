@@ -1,1 +1,1 @@
-Forwarder(x : a | ⊥, y : ^a * 1) = x(u); wait x; y(v) u = v in close y
+Forwarder(x : ?a; !^a; 1) = x(u). x(v) u = v in close x

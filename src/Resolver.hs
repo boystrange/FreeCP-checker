@@ -43,6 +43,8 @@ resolveT tdefs = aux []
     aux :: [TypeName] -> TypeS -> TypeS
     aux tnames One  = One
     aux tnames Bot  = Bot
+    aux tnames Skip = Skip
+    aux tnames (Seq t s) = Seq (aux tnames t) (aux tnames s)
     aux tnames (Poly d tname) = Poly d tname
     aux tnames (Var tname) | tname `elem` tnames = Var tname
     aux tnames (Var tname) =

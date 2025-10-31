@@ -149,11 +149,14 @@ prettyType prettyMeasure = annotate (PT.colorDull PT.Cyan) . aux
   where
     aux One  = keyword "1"
     aux Bot  = keyword "⊥"
+    aux Skip = keyword "skip"
+    aux (Seq t s) = parens (aux t <> operator ";" <+> aux s)
+    aux (Poly d tname) = (if d then operator "^" else emptyDoc) <> identifier (show tname)
     aux (Var tname) = identifier (show tname)
     aux (Rec tname t) = keyword "rec" <+> identifier (show tname) <> Render.dot <> aux t
-    aux (Par t s) = brackets (aux t <+> bar <+> aux s)
-    aux (Mul t s) = brackets (aux t <+> operator "*" <+> aux s)
-    aux (Plus bs) = operator "+" <> embrace lbrace rbrace comma (map auxB bs)
+    aux (Par t s) = parens (aux t <+> operator "⅋" <+> aux s)
+    aux (Mul t s) = parens (aux t <+> operator "⊗" <+> aux s)
+    aux (Plus bs) = operator "⊕" <> embrace lbrace rbrace comma (map auxB bs)
     aux (With bs) = operator "&" <> embrace lbrace rbrace comma (map auxB bs)
     aux (Put m t) = operator "++" <> brackets (prettyMeasure m) <+> aux t
     aux (Get m t) = operator "--" <> brackets (prettyMeasure m) <+> aux t
