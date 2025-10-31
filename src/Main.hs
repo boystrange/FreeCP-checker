@@ -81,7 +81,7 @@ main = do
             hFlush stdout)
       start <- getCurrentTime
       let pdefs = if manualI then pdefs0 else Instrumenter.instrument pdefs0
-      let (cs0, pdefs'') = Checker.checkTypes strat pdefs
+      (cs0, pdefs'') <- Checker.checkTypes strat pdefs
       -- let (σ, cs1) = Measure.gatherSubstitutions cs0
       -- let cs = map (subst σ) cs1
       -- let pdefs' = map (substProcessDef σ) pdefs''

@@ -169,8 +169,8 @@ hnf t =
         Par s1 s2 -> Par s1 (Seq s2 t2)
         Plus bs -> Plus (map (\(l, s) -> (l, Seq s t2)) bs)
         With bs -> With (map (\(l, s) -> (l, Seq s t2)) bs)
-        Put m t -> Put m (Seq t t2)
-        Get m t -> Get m (Seq t t2)
+        Put m s -> Put m (Seq s t2)
+        Get m s -> Get m (Seq s t2)
         _ -> error "this should be impossible"
     Poly d tname -> Seq (Poly d tname) Skip
     Rec _ _ -> error "this should be impossible"

@@ -46,6 +46,7 @@ instrument = map goD
     goP p = p
 
     goT :: TypeS -> TypeS
+    goT (Seq t s) = Seq (goT t) (goT s)
     goT (Rec tname t) = Rec tname (goT t)
     goT (Par t s) = Par (goT t) (goT s)
     goT (Mul t s) = Mul (goT t) (goT s)

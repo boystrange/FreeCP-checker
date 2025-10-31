@@ -49,6 +49,7 @@ data MyException
   | ErrorLinearity [ChannelName]
   | ErrorRuntime String
   | ErrorGeneric
+  | ErrorDebug String
   | ErrorSecurity String
 
 instance Exception MyException
@@ -74,3 +75,4 @@ instance Show MyException where
   show (ErrorRuntime msg) = "runtime error: " ++ msg
   show (ErrorSecurity msg) = "security error: " ++ msg
   show ErrorGeneric = "generic error"
+  show (ErrorDebug msg) = "debug " ++ msg

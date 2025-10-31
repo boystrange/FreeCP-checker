@@ -27,6 +27,7 @@ module Render
   , printOK
   , printNO
   , printType
+  , printContext
   , printSolution
   , printProcess
   , printProcessDec )
@@ -40,6 +41,7 @@ import Prelude hiding ((<>))
 import Prettyprinter
 import qualified Prettyprinter.Render.String as PR
 import qualified Prettyprinter.Render.Terminal as PT
+import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Char (chr, ord)
@@ -163,14 +165,22 @@ prettyType prettyMeasure = annotate (PT.colorDull PT.Cyan) . aux
 
     auxB (tag, t) = constant (show tag) <+> colon <+> aux t
 
+prettyContext :: (m -> Document) -> Map ChannelName (Type m)  -> Document
+prettyContext prettyMeasure ctx = embrace lbrace rbrace comma (map prettyBind (Map.toList ctx))
+  where
+    prettyBind (x, t) = identifier (show x) <+> operator ":" <+> prettyType prettyMeasure t
+
 instance Show m => Show (Type m) where
   show = PR.renderString . layoutPretty defaultLayoutOptions . prettyType unprettyMeasure
     where
-      unprettyMeasure = const (pretty "...")
+      unprettyMeasure = const (pretty "…")
 
 -- |Print a type.
 printType :: TypeM -> IO ()
 printType = PT.putDoc . prettyType prettyMeasure
+
+printContext :: Map ChannelName TypeM -> IO ()
+printContext = PT.putDoc . prettyContext prettyMeasure
 
 -- PROCESSES
 

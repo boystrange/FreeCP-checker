@@ -30,10 +30,11 @@ import Data.Set (Set)
 import Data.List (sort)
 import qualified Data.Set as Set
 import Control.Monad (forM_, forM, when, unless)
-import Control.Monad.State.Lazy (State)
+import Control.Monad.State.Lazy (StateT)
 import qualified Control.Monad.State.Lazy as State
 import Control.Exception (throw)
 import Data.Maybe ( fromJust )
+import qualified Render
 
 import Debug.Trace
 
@@ -47,7 +48,7 @@ import Exceptions
 
 type TypeContext = Map TypeName TypeM
 type ProcessContext = Map ProcessName (Measure, [TypeM])
-type Checker = State (ProcessContext, TVar, MVar, TypeContext, [MeasureConstraint])
+type Checker = StateT (ProcessContext, TVar, MVar, TypeContext, [MeasureConstraint]) IO
 
 find :: TypeM -> Checker TypeM
 find t@(Poly d tname) = do
@@ -78,6 +79,11 @@ unify = mapM_ aux
         auxT :: [(TypeM, TypeM)] -> TypeM -> TypeM -> Checker ()
         auxT vs t s | (t, s) `elem` vs = return ()
         auxT vs t s = do
+          State.lift $ putStrLn "UNIFY"
+          State.lift $ Render.printType t
+          State.lift $ putStrLn "\nAND"
+          State.lift $ Render.printType s
+          State.lift $ putStrLn "\n"
           tf <- find (Type.unfold t)
           sf <- find (Type.unfold s)
           auxV ((tf, sf) : vs) tf sf
@@ -309,8 +315,8 @@ insert ctx x t =
 -- | Check that all process definitions are well typed. The first
 -- argument is the subtyping relation being used, so that it is
 -- possible to choose among fair and unfair subtyping.
-checkTypes :: Strategy -> [ProcessDefS] -> ([MeasureConstraint], [ProcessDef])
-checkTypes strat pdefs = State.evalState (checkProgram pdefs) (Map.empty, toEnum 0, toEnum 0, Map.empty, [])
+checkTypes :: Strategy -> [ProcessDefS] -> IO ([MeasureConstraint], [ProcessDef])
+checkTypes strat pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, toEnum 0, Map.empty, [])
   where
     checkProgram :: [ProcessDefS] -> Checker ([MeasureConstraint], [ProcessDef])
     checkProgram pdefs = do
@@ -353,6 +359,10 @@ checkTypes strat pdefs = State.evalState (checkProgram pdefs) (Map.empty, toEnum
       (μ, ts) <- getProcess pname
       unless (length ts == length xs) $ throw $ ErrorArityMismatch pname (length ts) (length xs)
       let ctx' = Map.fromList (zip xs ts)
+      State.lift $ Render.printContext ctx
+      State.lift $ putStrLn ""
+      State.lift $ Render.printContext ctx'
+      State.lift $ putStrLn ""
       checkContextSub ctx' ctx
       return (Call pname xs, mcall strat μ)
     -- Link
@@ -470,6 +480,7 @@ checkTypes strat pdefs = State.evalState (checkProgram pdefs) (Map.empty, toEnum
     auxP ctx (GetGas x p) = do
       (ctx, t) <- remove ctx x
       case Type.hnf t of
+        -- _ -> throw $ ErrorTypeMismatch x "debug" t
         Type.Get ν s -> do
           ctx <- insert ctx x s
           (p', μ) <- auxP ctx p
