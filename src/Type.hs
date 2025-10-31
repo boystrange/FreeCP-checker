@@ -36,9 +36,10 @@ import Control.Monad (forM_)
 data TypeVariable = PolyVar TypeName | RecVar TypeName
   deriving (Eq, Ord)
 
+type TMap m = Map TypeVariable (Type m)
+
 class Ord a => TypeVariables a where
-  tvars :: a -> Set TypeVariable
-  tsubst :: TypeVariable -> a -> a -> a
+  tvars  :: a -> Set TypeVariable
 
 data TVar = TVar Int
   deriving (Eq, Ord)
@@ -119,7 +120,7 @@ wf t = case aux [] t of
     aux us (Put _ t) = aux us t
     aux us (Get _ t) = aux us t
 
-instance Ord a => TypeVariables (Type a) where
+instance Ord m => TypeVariables (Type m) where
   tvars (Poly _ tname) = Set.singleton (PolyVar tname)
   tvars (Var tname)    = Set.singleton (RecVar tname)
   tvars (Rec tname t)  = Set.delete (RecVar tname) (tvars t)
@@ -132,25 +133,24 @@ instance Ord a => TypeVariables (Type a) where
   tvars (Seq t s)      = Set.union (tvars t) (tvars s)
   tvars _              = Set.empty
 
-  tsubst tname t = substs (Map.singleton tname t)
+tsubst :: TypeVariable -> Type m -> Type m -> Type m
+tsubst tname t = tsubsts (Map.singleton tname t)
+
+tsubsts :: TMap m -> Type m -> Type m
+tsubsts tmap (Seq t1 t2)    = Seq (tsubsts tmap t1) (tsubsts tmap t2)
+tsubsts tmap (Par t1 t2)    = Par (tsubsts tmap t1) (tsubsts tmap t2)
+tsubsts tmap (Mul t1 t2)    = Mul (tsubsts tmap t1) (tsubsts tmap t2)
+tsubsts tmap (Plus bs)      = Plus (mapSnd (tsubsts tmap) bs)
+tsubsts tmap (With bs)      = With (mapSnd (tsubsts tmap) bs)
+tsubsts tmap (Put m t)      = Put m (tsubsts tmap t)
+tsubsts tmap (Get m t)      = Get m (tsubsts tmap t)
+tsubsts tmap (Poly d sname) | Just t <- Map.lookup (PolyVar sname) tmap = if d then dual t else t
+tsubsts tmap (Var sname)    | Just t <- Map.lookup (RecVar sname) tmap = t
+tsubsts tmap (Rec sname s)  = Rec sname (tsubsts (Map.delete (RecVar sname) tmap) s)
+tsubsts tmap s = s
 
 instance TypeVariables a => TypeVariables [a] where
-  tvars = undefined
-
-  tsubst = undefined
-
-substs :: Map TypeVariable (Type m) -> Type m -> Type m
-substs tmap (Seq t1 t2)    = Seq (substs tmap t1) (substs tmap t2)
-substs tmap (Par t1 t2)    = Par (substs tmap t1) (substs tmap t2)
-substs tmap (Mul t1 t2)    = Mul (substs tmap t1) (substs tmap t2)
-substs tmap (Plus bs)      = Plus (mapSnd (substs tmap) bs)
-substs tmap (With bs)      = With (mapSnd (substs tmap) bs)
-substs tmap (Put m t)      = Put m (substs tmap t)
-substs tmap (Get m t)      = Get m (substs tmap t)
-substs tmap (Poly d sname) | Just t <- Map.lookup (PolyVar sname) tmap = if d then dual t else t
-substs tmap (Var sname)    | Just t <- Map.lookup (RecVar sname) tmap = t
-substs tmap (Rec sname s)  = Rec sname (substs (Map.delete (RecVar sname) tmap) s)
-substs tmap s = s
+  tvars = Set.unions . map tvars
 
 unfold :: Ord m => Type m -> Type m
 unfold t@(Rec tname s) = tsubst (RecVar tname) t s

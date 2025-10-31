@@ -126,14 +126,12 @@ Process
   : '(' Process ')' { $2 }
   | ChannelName '=' ChannelName { Link $1 $3 }
   | CLOSE ChannelName { Close $2 }
-  | WAIT ChannelName ';' Process { Wait $2 $4 }
+  | WAIT ChannelName '.' Process { Wait $2 $4 }
   | ChannelName '(' ChannelName ')' Process IN Process { Fork $1 $3 $5 $7 }
-  | ChannelName '(' ChannelName ')' ';' Process { Join $1 $3 $6 }
-  | ChannelName '.' Label ';' Process { Select $1 $3 $5 }
+  | ChannelName '(' ChannelName ')' '.' Process { Join $1 $3 $6 }
+  | ChannelName '[' Label ']' '.' Process { Select $1 $3 $6 }
   | CASE ChannelName Cases { Case $2 $3 }
   | NEW '(' ChannelName ':' TypeExpr ')' Process IN Process { Cut $3 $5 $7 $9 }
-  | ChannelName '++' ';' Process { PutGas $1 $4 }
-  | ChannelName '--' ';' Process { GetGas $1 $4 }
   | ProcessName Names { Call $1 $2 }
 
 Names
@@ -194,7 +192,7 @@ Label
 
 TypeExpr
   : Type { Type $1 }
-  | '^' '(' Type ')' { Dual $3 }
+  | '^' Type { Dual $2 }
 
 Type
   : Num  { if $1 == 1 then One

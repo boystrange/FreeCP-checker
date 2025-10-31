@@ -62,7 +62,7 @@ instantiate ts = do
   let vs = Set.toList (tvars ts)
   ss <- mapM (const newTypeVar) vs
   let tmap = Map.fromList (zip vs ss)
-  return (map (substs tmap) ts)
+  return (map (tsubsts tmap) ts)
 
 addTypeConstraint :: TypeName -> TypeM -> Checker ()
 addTypeConstraint tname t = do

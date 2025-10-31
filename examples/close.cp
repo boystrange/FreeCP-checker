@@ -1,0 +1,1 @@
+Main(x : 1) = close x
