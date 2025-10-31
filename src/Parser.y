@@ -203,7 +203,7 @@ Type
   : Num  { if $1 == 1 then One
            else error $ (show $1) ++ " is not a type" }
   | '⊥'  { Bot }
-  | TypeName { Var $1 }
+  | TypeName { Var $1 Skip }
   | PolyName { Poly False $1 }
   | '^' PolyName { Poly True $2 }
   | '(' Type ')' { $2 }
@@ -212,7 +212,7 @@ Type
   | '!' Type { Mul $2 Skip }
   | '?' Type { Par $2 Skip }
   | SKIP { Skip }
-  | Type ';' Type { Seq $1 $3 }
+  | Type ';' Type { Type.qes $3 $1 }
   | '&' Branches { With $2 }
   | '+' Branches { Plus $2 }
   | '++' MeasureOpt Type { Put $2 $3 }
