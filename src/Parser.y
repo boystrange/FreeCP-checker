@@ -64,6 +64,8 @@ import Control.Exception
   '}'       { Token _ TokenRBrace }
   '['       { Token _ TokenLBrack }
   ']'       { Token _ TokenRBrack }
+  '<'       { Token _ TokenLAngle }
+  '>'       { Token _ TokenRAngle }
   '&'       { Token _ TokenAmp }
   '|'       { Token _ TokenPar }
   '⊥'       { Token _ TokenBot }
@@ -128,6 +130,9 @@ Process
   | CLOSE ChannelName { Close $2 }
   | WAIT ChannelName '.' Process { Wait $2 $4 }
   | ChannelName '(' ChannelName ')' Process IN Process { Fork $1 $3 $5 $7 }
+  | ChannelName '<' ChannelName '>' '.' Process
+    { let tmp = Identifier (At $ getPos $2) "_tmp_" in
+      Fork $1 tmp (Link $3 tmp) $6 }
   | ChannelName '(' ChannelName ')' '.' Process { Join $1 $3 $6 }
   | ChannelName '[' Label ']' '.' Process { Select $1 $3 $6 }
   | CASE ChannelName Cases { Case $2 $3 }

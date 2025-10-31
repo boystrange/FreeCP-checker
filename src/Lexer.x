@@ -64,7 +64,9 @@ tokens :-
   "}"     { lex' TokenRBrace      }
   "["     { lex' TokenLBrack      }
   "]"     { lex' TokenRBrack      }
+  "<"     { lex' TokenLAngle      }
   "⟨"     { lex' TokenLAngle      }
+  ">"     { lex' TokenRAngle      }
   "⟩"     { lex' TokenRAngle      }
   "="     { lex' TokenEQ          }
   "⊥"     { lex' TokenBot         }
