@@ -20,7 +20,6 @@ executable freecp
   other-modules:     Common,
                      Atoms,
                      Measure,
-                     Strategy,
                      Type,
                      Process,
                      Resolver,

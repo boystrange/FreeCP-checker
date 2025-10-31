@@ -41,7 +41,6 @@ import Debug.Trace
 import Common
 import Atoms
 import Measure
-import Strategy
 import Type
 import Process
 import Exceptions
@@ -310,8 +309,8 @@ insert ctx x t =
 -- | Check that all process definitions are well typed. The first
 -- argument is the subtyping relation being used, so that it is
 -- possible to choose among fair and unfair subtyping.
-checkTypes :: Strategy -> [ProcessDefS] -> IO ([MeasureConstraint], [ProcessDef])
-checkTypes strat pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, toEnum 0, Map.empty, [])
+checkTypes :: [ProcessDefS] -> IO ([MeasureConstraint], [ProcessDef])
+checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, toEnum 0, Map.empty, [])
   where
     checkProgram :: [ProcessDefS] -> Checker ([MeasureConstraint], [ProcessDef])
     checkProgram pdefs = do
@@ -359,7 +358,7 @@ checkTypes strat pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnu
       State.lift $ Render.printContext ctx'
       State.lift $ putStrLn ""
       checkContextSub ctx' ctx
-      return (Call pname xs, mcall strat μ)
+      return (Call pname xs, μ)
     -- Link
     auxP ctx (Link x y) = do
       (ctx, t) <- remove ctx x
@@ -367,7 +366,7 @@ checkTypes strat pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnu
       checkEmpty ctx
       checkTypeEq x t (Type.dual s)
       μ <- MRef <$> newMeasureVar
-      return (Link x y, mlink strat μ)
+      return (Link x y, mzero)
     -- Rule [⊥]
     auxP ctx (Wait x p) = do
       -- Remove the association for x from the context.
@@ -386,7 +385,7 @@ checkTypes strat pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnu
       -- Make sure that the type of x is !end
       checkTypeEq x Type.One (Type.unfold t)
       μ <- MRef <$> newMeasureVar
-      return (Close x, mclose strat μ)
+      return (Close x, msucc μ)
     -- Rule [#]
     auxP ctx (Join x y p) = do
       -- If y already occurs in the context it shadows a linear name
@@ -419,7 +418,7 @@ checkTypes strat pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnu
           (p', μ) <- auxP ctxp p
           -- Update the type of x and type check the continuation.
           (q', ν) <- auxP ctxq q
-          return (Fork x y p' q', mfork strat (madd μ ν))
+          return (Fork x y p' q', madd μ ν)
         -- If it is any other type...
         _ -> throw $ ErrorTypeMismatch x "*" t
     -- Rule [⊕]
@@ -431,7 +430,7 @@ checkTypes strat pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnu
             Just sk -> do
               ctx <- insert ctx x sk
               (p', μ) <- auxP ctx p
-              return (Select x tag p', mtag strat μ)
+              return (Select x tag p', msucc μ)
             Nothing -> throw $ ErrorLabelMismatch x (map fst bs) [tag]
         _ -> throw $ ErrorTypeMismatch x "⊕" t
     -- Rule [&]
@@ -469,7 +468,7 @@ checkTypes strat pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnu
         Type.Put ν s -> do
           ctx <- insert ctx x s
           (p', μ) <- auxP ctx p
-          return (PutGas x p', mput strat (madd μ ν))
+          return (PutGas x p', madd μ ν)
         _ -> throw $ ErrorTypeMismatch x "++" t
     -- Rule [get]
     auxP ctx (GetGas x p) = do

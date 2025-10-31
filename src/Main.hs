@@ -29,7 +29,6 @@ import qualified Checker
 import qualified Solver
 import Atoms
 import Measure
-import Strategy
 import Render
 import Exceptions (MyException)
 import Parser (parseProcess)
@@ -68,20 +67,12 @@ main = do
     check file args pdefs0 = do
       let verbose = Verbose `elem` args
       let logging = Logging `elem` args
-      let manualI = ManualI `elem` args
-      let strat =
-            Strategy { mcall  = if OnlyCall `elem` args then msucc else id
-                     , mlink  = if OnlyCall `elem` args || FreeLink `elem` args then id else msucc
-                     , mclose = if OnlyCall `elem` args || FreeClose `elem` args then id else msucc
-                     , mfork  = if OnlyCall `elem` args || FreeFork `elem` args then id else msucc
-                     , mtag   = if OnlyCall `elem` args || FreeSelect `elem` args then id else msucc
-                     , mput   = if OnlyCall `elem` args || FreePut `elem` args then id else msucc }
       when logging
         (do putStr $ takeFileName file ++ " ... "
             hFlush stdout)
       start <- getCurrentTime
-      let pdefs = if manualI then pdefs0 else Instrumenter.instrument pdefs0
-      (cs0, pdefs'') <- Checker.checkTypes strat pdefs
+      let pdefs = Instrumenter.instrument pdefs0
+      (cs0, pdefs'') <- Checker.checkTypes pdefs
       -- let (σ, cs1) = Measure.gatherSubstitutions cs0
       -- let cs = map (subst σ) cs1
       -- let pdefs' = map (substProcessDef σ) pdefs''
@@ -110,13 +101,6 @@ main = do
 data Flag = Verbose  -- -v --verbose
           | Version  -- -V --version
           | Logging  --    --log
-          | FreePut  -- -p --free-put
-          | FreeClose
-          | FreeLink
-          | FreeFork
-          | FreeSelect
-          | OnlyCall -- -c --only-call
-          | ManualI  -- -i --disable-instrumentation
           | Help     --    --help
             deriving (Eq, Ord)
 
@@ -126,14 +110,7 @@ flags =
    [ Option []  ["log"]                     (NoArg Logging)    "Log type checking time"
    , Option "v" ["verbose"]                 (NoArg Verbose)    "Print type checking and running activities"
    , Option "V" ["version"]                 (NoArg Version)    "Print version information"
-   , Option "h" ["help"]                    (NoArg Help)       "Print this help message"
-   , Option "c" ["free-close"]              (NoArg FreeClose)  "Close operations cost nothing"
-   , Option "p" ["free-put"]                (NoArg FreePut)    "Put operations cost nothing"
-   , Option "l" ["free-link"]               (NoArg FreeLink)   "Link operations cost nothing"
-   , Option "f" ["free-fork"]               (NoArg FreeFork)   "Fork operations cost nothing"
-   , Option "s" ["free-select"]             (NoArg FreeSelect) "Select operations cost nothing"
-   , Option "r" ["just-call"]               (NoArg OnlyCall)   "Only process invocations are measured"
-   , Option "i" ["disable-instrumentation"] (NoArg ManualI)    "Disable automatic instrumentation"]
+   , Option "h" ["help"]                    (NoArg Help)       "Print this help message" ]
 
 -- |The information displayed when the verbose option is specified.
 versionInfo :: String -> String
