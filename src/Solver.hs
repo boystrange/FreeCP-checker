@@ -27,7 +27,7 @@ import Debug.Trace
 
 import Numeric.Limp.Rep.Rep     as R
 import Numeric.Limp.Rep.IntDouble     as R
-import Numeric.Limp.Program.ResultKind (K(KR))
+import Numeric.Limp.Program.ResultKind (K(KZ))
 import Numeric.Limp.Program as P
 import Numeric.Limp.Canon   as C
 import Numeric.Limp.Solve.Simplex.Maps   as SM
@@ -61,13 +61,13 @@ limp prog = bb prog'
 
     bb = B.branch solver
 
-type MyAssignment = Assignment () MVar R.IntDouble
-type MyProgram = P.Program () MVar R.IntDouble
-type MyLinear = P.Linear () MVar R.IntDouble KR
-type MyConstraint = P.Constraint () MVar R.IntDouble
-type MyBounds = Bounds () MVar R.IntDouble
+type MyAssignment = Assignment MVar () R.IntDouble
+type MyProgram = P.Program MVar () R.IntDouble
+type MyLinear = P.Linear MVar () R.IntDouble KZ
+type MyConstraint = P.Constraint MVar () R.IntDouble
+type MyBounds = Bounds MVar () R.IntDouble
 
-type Solution = Map MVar Double
+type Solution = Map MVar Int
 
 solve :: [MVar] -> [Measure.MeasureConstraint] -> Maybe Solution
 solve μs cs =
@@ -79,7 +79,7 @@ solve μs cs =
     program = P.minimise objective constraint bounds
 
     objective :: MyLinear
-    objective = foldr (.+.) (conR 0) [ r i 1 | i <- μs ]
+    objective = foldr (.+.) (conZ 0) (map z1 μs)
 
     constraints :: [MyConstraint]
     constraints = map auxC cs
@@ -87,20 +87,21 @@ solve μs cs =
         auxC (CEq m n) = auxM m :== auxM n
         auxC (CLe m n) = auxM m :<= auxM n
 
-        auxM (MCon k) = conR (fromIntegral k)
-        auxM (MRef i) = r1 i
+        auxM (MCon k) = conZ (fromIntegral k)
+        auxM (MRef i) = z1 i
         auxM (MAdd m n) = auxM m .+. auxM n
         auxM (MSub m n) = auxM m .-. auxM n
-        auxM (MMul w m) = R w *. auxM m
+        -- auxM (MMul w m) = R w *. auxM m
 
     constraint :: MyConstraint
     constraint = foldl (:&&) CTrue constraints
 
     bounds :: [MyBounds]
-    bounds = map (lowerR 0) μs
+    bounds = map (lowerZ 0) μs
 
-    assigned :: MyAssignment -> Int -> Double
-    assigned ass i = unwrapR $ rOf ass (toEnum i)
+    assigned :: MyAssignment -> Int -> Int
+    assigned ass i = -- unwrapR $ rOf ass (toEnum i)
+      fromIntegral $ zOf ass (toEnum i)
 
     -- aux :: MyAssignment -> ProcessDefM -> ProcessDefI
     -- aux ass (pname, m, us, _) = (pname, auxM ass m, map (auxB ass) us, Nothing)
