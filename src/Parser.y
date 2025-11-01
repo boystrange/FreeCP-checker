@@ -203,7 +203,7 @@ Type
   : Num  { if $1 == 1 then One
            else error $ (show $1) ++ " is not a type" }
   | '⊥'  { Bot }
-  | TypeName { Var $1 Skip }
+  | TypeName { Var $1 }
   | PolyName { Poly False $1 }
   | '^' PolyName { Poly True $2 }
   | '(' Type ')' { $2 }

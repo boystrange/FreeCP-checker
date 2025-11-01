@@ -46,8 +46,9 @@ instrument = map goD
     goP p = p
 
     goT :: TypeS -> TypeS
-    goT (Var tname t) = Var tname (goT t)
+    goT (Var tname) = Var tname
     goT (Rec tname t) = Rec tname (goT t)
+    goT (Seq t s) = Seq (goT t) (goT s)
     goT (Par t s) = Par (goT t) (goT s)
     goT (Mul t s) = Mul (goT t) (goT s)
     goT (With bs) = With (mapSnd (Get Nothing . goT) bs)

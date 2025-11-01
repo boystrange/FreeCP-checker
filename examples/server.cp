@@ -15,3 +15,16 @@ Server(x : A; a, y : (!^a); 1) =
         y<x>.
         close y
   }
+
+  Client(x : ^ A; ⊥) =
+    x[req].
+    x[req].
+    x[req].
+    x[stop].
+    case x {
+        resp : case x {
+            resp : case x {
+                resp : close x
+            }
+        }
+    }

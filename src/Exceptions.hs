@@ -50,7 +50,7 @@ data MyException
   | ErrorRuntime String
   | ErrorGeneric
   | ErrorDebug String
-  | ErrorSecurity String
+  | ErrorNotImplemented String
 
 instance Exception MyException
 
@@ -73,6 +73,6 @@ instance Show MyException where
   show (ErrorTypeUnbounded name) = "unbounded type: " ++ showWithPos name
   show (ErrorTypeNonContractive tname) = "non-contractive type: " ++ showWithPos tname
   show (ErrorRuntime msg) = "runtime error: " ++ msg
-  show (ErrorSecurity msg) = "security error: " ++ msg
   show ErrorGeneric = "generic error"
   show (ErrorDebug msg) = "debug " ++ msg
+  show (ErrorNotImplemented msg) = "not implemented: " ++ msg

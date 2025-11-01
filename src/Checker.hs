@@ -73,58 +73,65 @@ unify :: [(ChannelName, TypeM, TypeM)] -> Checker ()
 unify = mapM_ aux
   where
     aux :: (ChannelName, TypeM, TypeM) -> Checker ()
-    aux (name, t, s) = auxT [] t s
+    aux (name, t, s) = auxT t s
       where
-        auxT :: [(TypeM, TypeM)] -> TypeM -> TypeM -> Checker ()
-        auxT vs t s | (t, s) `elem` vs = return ()
-        auxT vs t s = do
+        auxT :: TypeM -> TypeM -> Checker ()
+        auxT t s = do
           State.lift $ putStrLn "UNIFY"
           State.lift $ Render.printType t
           State.lift $ putStrLn "\nAND"
           State.lift $ Render.printType s
           State.lift $ putStrLn "\n"
-          tf <- find (Type.unfold t)
-          sf <- find (Type.unfold s)
-          auxV ((tf, sf) : vs) tf sf
+          tf <- find t
+          sf <- find s
+          auxV tf sf
 
         -- unification for polymorphic variables
-        auxV vs (Poly False tname1) (Poly False tname2) | tname1 == tname2 = return ()
-        auxV vs t@(Poly False tname) s | Set.member (PolyVar tname) (tvars s) = throw $ ErrorTypeMismatch name (show t) s
-        auxV vs t@(Poly _ tname1) s@(Poly _ tname2) | tname1 > tname2 = auxT vs s t
-        auxV vs (Poly False tname) t = addTypeConstraint tname t
-        auxV vs (Poly True tname) t = auxT vs (Type.dual t) (Poly False tname)
-        auxV vs t s@(Poly _ _) = auxT vs s t
+        auxV (Poly False tname) (Poly False sname) | tname == sname = return ()
+        auxV t@(Poly False tname) s | Set.member (PolyVar tname) (tvars s) = throw $ ErrorTypeMismatch name (show t) s
+        auxV t@(Poly _ tname) s@(Poly _ sname) | tname > sname = auxT s t
+        auxV (Poly False tname) s | Set.null (rvars s) = addTypeConstraint tname s
+                                  | otherwise = throw $ ErrorNotImplemented "unification with free recursion variables"
+        auxV (Poly True tname) s = auxT (Type.dual s) (Poly False tname)
+        auxV t s@(Poly _ _) = auxT s t
+
+        -- unification for equi-recursive types
+        auxV (Var tname) (Var sname) | tname == sname = return ()
+        auxV (Rec tname t) (Rec sname s) | tname == sname = auxT t s
 
         -- unification for sequential composition
-        auxV vs Skip        Skip        = return ()
+        auxV Skip        Skip        = return ()
+        auxV (Seq t1 s1) (Seq t2 s2) = do
+          auxT t1 t2
+          auxT s1 s2
 
         -- unification for regular constructors
-        auxV vs One         One         = return ()
-        auxV vs Bot         Bot         = return ()
-        auxV vs (Par t1 s1) (Par t2 s2) = do
-          auxT vs t1 t2
-          auxT vs s1 s2
-        auxV vs (Mul t1 s1) (Mul t2 s2) = do
-          auxT vs t1 t2
-          auxT vs s1 s2
-        auxV vs (With bs1) (With bs2) = do
+        auxV One         One         = return ()
+        auxV Bot         Bot         = return ()
+        auxV (Par t1 s1) (Par t2 s2) = do
+          auxT t1 t2
+          auxT s1 s2
+        auxV (Mul t1 s1) (Mul t2 s2) = do
+          auxT t1 t2
+          auxT s1 s2
+        auxV (With bs1) (With bs2) = do
           let m1 = Map.fromList bs1
           let m2 = Map.fromList bs2
           tle (Map.keysSet m2) (Map.keysSet m1)
-          forM_ (Map.elems (zipMap m1 m2)) (uncurry (auxT vs))
-        auxV vs (Plus bs1) (Plus bs2) = do
+          forM_ (Map.elems (zipMap m1 m2)) (uncurry auxT)
+        auxV (Plus bs1) (Plus bs2) = do
           let m1 = Map.fromList bs1
           let m2 = Map.fromList bs2
           tle (Map.keysSet m1) (Map.keysSet m2)
-          forM_ (Map.elems (zipMap m1 m2)) (uncurry (auxT vs))
-        auxV vs (Put m t) (Put n s) = do
-          auxT vs t s
+          forM_ (Map.elems (zipMap m1 m2)) (uncurry auxT)
+        auxV (Put m t) (Put n s) = do
+          auxT t s
           addMeasureConstraintEq n m
-        auxV vs (Get m t) (Get n s) = do
-          auxT vs t s
+        auxV (Get m t) (Get n s) = do
+          auxT t s
           addMeasureConstraintEq m n
         -- type mismatch
-        auxV _ t s = throw $ ErrorTypeMismatch name (show t) s
+        auxV t s = throw $ ErrorTypeMismatch name (show t) s
 
         tle tags1 tags2 =
           unless (tags1 == tags2) $
@@ -162,12 +169,14 @@ annotateType :: TypeS -> Checker TypeM
 annotateType = aux
   where
     aux (Poly tname t) = return $ Poly tname t
-    aux (Var tname t) = do
-      t' <- aux t
-      return $ Var tname t'
+    aux (Var tname) = return $ Var tname
     aux One = return One
     aux Bot = return Bot
     aux Skip = return Skip
+    aux (Seq t s) = do
+      t' <- aux t
+      s' <- aux s
+      return $ Seq t' s'
     aux (Rec tname t) = do
       t' <- aux t
       return $ Rec tname t'
@@ -424,8 +433,14 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
     -- Rule [⊕]
     auxP ctx (Select x tag p) = do
       (ctx, t) <- remove ctx x
+      State.lift $ putStrLn "SELECT"
+      State.lift $ Render.printType t
+      State.lift $ putStrLn ""
       case Type.unfold t of
-        Type.Plus bs -> do
+        s@(Type.Plus bs) -> do
+          State.lift $ putStrLn "SELECT UNFOLDED"
+          State.lift $ Render.printType s
+          State.lift $ putStrLn ""
           case lookup tag bs of
             Just sk -> do
               ctx <- insert ctx x sk
@@ -438,6 +453,9 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       μ <- MRef <$> newMeasureVar
       -- Remove the association for x from the context.
       (ctx, t) <- remove ctx x
+      State.lift $ putStrLn "CASE"
+      State.lift $ Render.printType t
+      State.lift $ putStrLn ""
       -- Check the shape of the type associated with x.
       case Type.unfold t of
         -- If it is a "with"...

@@ -44,17 +44,17 @@ resolveT tdefs = aux []
     aux tnames One  = One
     aux tnames Bot  = Bot
     aux tnames Skip = Skip
+    aux tnames (Seq t s) = Seq (aux tnames t) (aux tnames s)
     aux tnames (Poly d tname) = Poly d tname
-    aux tnames (Var tname t) | tname `elem` tnames = Var tname (aux tnames t)
-    aux tnames (Var tname k) =
+    aux tnames (Var tname) | tname `elem` tnames = Var tname
+    aux tnames (Var tname) =
       case lookup tname tdefs of
         Nothing -> throw (ErrorUnknownIdentifier "type" (showWithPos tname))
         Just t  -> let s = aux (tname : tnames) t in
-                   let t' = if Set.member (RecVar tname) (tvars s) then
-                              Rec tname s
-                            else
-                              s
-                   in qes (aux tnames k) t'
+                   if Set.member (RecVar tname) (tvars s) then
+                      Rec tname s
+                    else
+                      s
     aux tnames (Par t s) = Par (aux tnames t) (aux tnames s)
     aux tnames (Mul t s) = Mul (aux tnames t) (aux tnames s)
     aux tnames (Plus bs) = Plus (mapSnd (aux tnames) bs)

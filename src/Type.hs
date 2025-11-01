@@ -39,7 +39,9 @@ data TypeVariable = PolyVar TypeName | RecVar TypeName
 type TMap m = Map TypeVariable (Type m)
 
 class Ord a => TypeVariables a where
-  tvars  :: a -> Set TypeVariable
+  tvars :: a -> Set TypeVariable
+  rvars :: a -> Set TypeName
+  rvars x = Set.fromList [ tname | RecVar tname <- Set.toList (tvars x) ]
 
 data TVar = TVar Int
   deriving (Eq, Ord)
@@ -57,8 +59,9 @@ data Type m
   = One
   | Bot
   | Skip
+  | Seq (Type m) (Type m)
   | Poly Bool TypeName
-  | Var TypeName (Type m)
+  | Var TypeName
   | Rec TypeName (Type m)
   | Par (Type m) (Type m)
   | Mul (Type m) (Type m)
@@ -77,46 +80,47 @@ type TypeM = Type Measure
 -- |A type definition is a pair consisting of a type name and a session type.
 type TypeDef = (TypeName, TypeS)
 
-wf :: Type m -> Bool
-wf t = case aux [] t of
-          Nothing -> False
-          Just _  -> True
-  where
-    aux us (Poly _ _) = return 1
-    aux us (Var tname _) | tname `elem` us = Nothing
-                         | otherwise = return 1
-    aux us (Rec tname t) = do
-      n <- aux (tname : us) t
-      if n == 0
-        then Nothing
-        else return 1
-    aux us Skip = return 0
-    aux us One = return 1
-    aux us Bot = return 1
-    aux us (Par t s) = do
-      _ <- aux [] t
-      _ <- aux [] s
-      return 1
-    aux us (Mul t s) = do
-      _ <- aux [] t
-      _ <- aux [] s
-      return 1
-    aux us (With bs) = do
-      forM_ bs (aux us . snd)
-      return 1
-    aux us (Plus bs) = do
-      forM_ bs (aux us . snd)
-      return 1
-    aux us (Put _ t) = aux us t
-    aux us (Get _ t) = aux us t
+-- wf :: Type m -> Bool
+-- wf t = case aux [] t of
+--           Nothing -> False
+--           Just _  -> True
+--   where
+--     aux us (Poly _ _) = return 1
+--     aux us (Var tname _) | tname `elem` us = Nothing
+--                          | otherwise = return 1
+--     aux us (Rec tname t) = do
+--       n <- aux (tname : us) t
+--       if n == 0
+--         then Nothing
+--         else return 1
+--     aux us Skip = return 0
+--     aux us One = return 1
+--     aux us Bot = return 1
+--     aux us (Par t s) = do
+--       _ <- aux [] t
+--       _ <- aux [] s
+--       return 1
+--     aux us (Mul t s) = do
+--       _ <- aux [] t
+--       _ <- aux [] s
+--       return 1
+--     aux us (With bs) = do
+--       forM_ bs (aux us . snd)
+--       return 1
+--     aux us (Plus bs) = do
+--       forM_ bs (aux us . snd)
+--       return 1
+--     aux us (Put _ t) = aux us t
+--     aux us (Get _ t) = aux us t
 
 qes :: Type m -> Type m -> Type m
 qes _ One            = One
 qes _ Bot            = Bot
 qes k Skip           = k
+qes k (Seq t s)      = Seq t (qes k s)
 qes _ (Poly d tname) = Poly d tname
-qes k (Var tname t)  = Var tname (qes k t)
-qes k (Rec tname t)  = Rec tname (qes k t)
+qes k (Var tname)    = Seq (Var tname) k
+qes k (Rec tname t)  = Seq (Rec tname t) k
 qes k (Par t s)      = Par t (qes k s)
 qes k (Mul t s)      = Mul t (qes k s)
 qes k (With bs)      = With (mapSnd (qes k) bs)
@@ -125,8 +129,9 @@ qes k (Put m t)      = Put m (qes k t)
 qes k (Get m t)      = Get m (qes k t)
 
 instance Ord m => TypeVariables (Type m) where
+  tvars (Seq t s)      = Set.union (tvars t) (tvars s)
   tvars (Poly _ tname) = Set.singleton (PolyVar tname)
-  tvars (Var tname t)  = Set.insert (RecVar tname) (tvars t)
+  tvars (Var tname)    = Set.singleton (RecVar tname)
   tvars (Rec tname t)  = Set.delete (RecVar tname) (tvars t)
   tvars (Par t s)      = Set.union (tvars t) (tvars s)
   tvars (Mul t s)      = Set.union (tvars t) (tvars s)
@@ -140,6 +145,7 @@ tsubst :: TypeVariable -> Type m -> Type m -> Type m
 tsubst tname t = tsubsts (Map.singleton tname t)
 
 tsubsts :: TMap m -> Type m -> Type m
+tsubsts tmap (Seq t s)      = qes (tsubsts tmap s) (tsubsts tmap t)
 tsubsts tmap (Par t s)      = Par (tsubsts tmap t) (tsubsts tmap s)
 tsubsts tmap (Mul t s)      = Mul (tsubsts tmap t) (tsubsts tmap s)
 tsubsts tmap (Plus bs)      = Plus (mapSnd (tsubsts tmap) bs)
@@ -147,15 +153,16 @@ tsubsts tmap (With bs)      = With (mapSnd (tsubsts tmap) bs)
 tsubsts tmap (Put m t)      = Put m (tsubsts tmap t)
 tsubsts tmap (Get m t)      = Get m (tsubsts tmap t)
 tsubsts tmap (Poly d sname) | Just t <- Map.lookup (PolyVar sname) tmap = if d then dual t else t
-tsubsts tmap (Var sname s)  | Just t <- Map.lookup (RecVar sname) tmap = qes s t
-tsubsts tmap (Rec sname s)  = Rec sname (tsubsts (Map.delete (RecVar sname) tmap) s)
+tsubsts tmap (Var sname)    | Just t <- Map.lookup (RecVar sname) tmap = t
+tsubsts tmap (Rec sname t)  = Rec sname (tsubsts (Map.delete (RecVar sname) tmap) t)
 tsubsts tmap s              = s
 
 instance TypeVariables a => TypeVariables [a] where
   tvars = Set.unions . map tvars
 
 unfold :: Ord m => Type m -> Type m
-unfold t@(Rec tname s) = tsubst (RecVar tname) t s
+unfold (Seq t s) = qes s (unfold t)
+unfold t@(Rec tname s) = unfold (tsubst (RecVar tname) t s)
 unfold t = t
 
 -- hnf :: Ord m => Type m -> Type m
@@ -183,8 +190,9 @@ dual :: Type m -> Type m
 dual One            = Bot
 dual Bot            = One
 dual Skip           = Skip
+dual (Seq t s)      = Seq (dual t) (dual s)
 dual (Poly d tname) = Poly (not d) tname
-dual (Var tname t)  = Var tname (dual t)
+dual (Var tname)    = Var tname
 dual (Rec tname t)  = Rec tname (dual t)
 dual (Par t s)      = Mul (dual t) (dual s)
 dual (Mul t s)      = Par (dual t) (dual s)
@@ -197,8 +205,9 @@ instance Functor Type where
   fmap f One            = One
   fmap f Bot            = Bot
   fmap f Skip           = Skip
+  fmap f (Seq t s)      = Seq (fmap f t) (fmap f s)
   fmap f (Poly d tname) = Poly d tname
-  fmap f (Var tname t)  = Var tname (fmap f t)
+  fmap f (Var tname)    = Var tname
   fmap f (Rec tname t)  = Rec tname (fmap f t)
   fmap f (Par t s)      = Par (fmap f t) (fmap f s)
   fmap f (Mul t s)      = Mul (fmap f t) (fmap f s)
@@ -208,16 +217,17 @@ instance Functor Type where
   fmap f (Get m t)      = Get (f m) (fmap f t)
 
 instance MeasureVariables t => MeasureVariables (Type t) where
-  mvars One              = Set.empty
-  mvars Bot              = Set.empty
-  mvars Skip             = Set.empty
-  mvars (Poly _ tname)   = Set.empty
-  mvars (Var tname t)    = mvars t
-  mvars (Rec tname t)    = mvars t
-  mvars (Par t s)        = Set.union (mvars t) (mvars s)
-  mvars (Mul t s)        = Set.union (mvars t) (mvars s)
-  mvars (With bs)        = Set.unions (map (mvars . snd) bs)
-  mvars (Plus bs)        = Set.unions (map (mvars . snd) bs)
-  mvars (Put m t)        = Set.union (mvars m) (mvars t)
-  mvars (Get m t)        = Set.union (mvars m) (mvars t)
+  mvars One            = Set.empty
+  mvars Bot            = Set.empty
+  mvars Skip           = Set.empty
+  mvars (Seq t s)      = Set.union (mvars t) (mvars s)
+  mvars (Poly _ tname) = Set.empty
+  mvars (Var tname)    = Set.empty
+  mvars (Rec tname t)  = mvars t
+  mvars (Par t s)      = Set.union (mvars t) (mvars s)
+  mvars (Mul t s)      = Set.union (mvars t) (mvars s)
+  mvars (With bs)      = Set.unions (map (mvars . snd) bs)
+  mvars (Plus bs)      = Set.unions (map (mvars . snd) bs)
+  mvars (Put m t)      = Set.union (mvars m) (mvars t)
+  mvars (Get m t)      = Set.union (mvars m) (mvars t)
   msubst = fmap . msubst
