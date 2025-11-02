@@ -82,6 +82,12 @@ tokens :-
   "^"     { lex' TokenDual        }
   "++"    { lex' TokenPut         }
   "--"    { lex' TokenGet         }
+  "▹"    { lex' TokenRTriangle   }
+  "◃"    { lex' TokenLTriangle   }
+  "|>"    { lex' TokenRTriangle   }
+  "<|"    { lex' TokenLTriangle   }
+  "<->"   { lex' TokenLRArrow     }
+  "↔"    { lex' TokenLRArrow     }
   @lid    { lex lookupLID         }
   @cid    { lex TokenCID          }
   @int    { lex (TokenINT . read) }
@@ -105,9 +111,6 @@ keywords :: [(String, TokenClass)]
 keywords = [("type",      TokenType),
             ("in",        TokenIn),
             ("new",       TokenNew),
-            ("case",      TokenCase),
-            ("close",     TokenClose),
-            ("wait",      TokenWait),
             ("skip",      TokenSkip)]
 
 lookupLID :: String -> TokenClass
@@ -159,6 +162,9 @@ data TokenClass
   | TokenGet
   | TokenPutGas
   | TokenGetGas
+  | TokenLTriangle
+  | TokenRTriangle
+  | TokenLRArrow
   | TokenEOF
   deriving (Show)
 

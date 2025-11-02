@@ -1,1 +1,1 @@
-Main(x : skip; 1) = close x
+Main(x : skip; 1; skip) = x[]

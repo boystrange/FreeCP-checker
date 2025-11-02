@@ -76,6 +76,9 @@ import Control.Exception
   '?'       { Token _ TokenQMark }
   '!'       { Token _ TokenEMark }
   '^'       { Token _ TokenDual }
+  '▹'      { Token _ TokenRTriangle }
+  '◃'      { Token _ TokenLTriangle }
+  '↔'      { Token _ TokenLRArrow }
 
 %nonassoc '}' ']' IN
 
@@ -128,16 +131,17 @@ Parameter
 
 Process
   : '(' Process ')' { $2 }
-  | ChannelName '=' ChannelName { Link $1 $3 }
-  | CLOSE ChannelName { Close $2 }
-  | WAIT ChannelName '.' Process { Wait $2 $4 }
+  | ChannelName '↔' ChannelName { Link $1 $3 }
+  | ChannelName '[' ']' { Close $1 }
+  | ChannelName '(' ')' '.' Process { Wait $1 $5 }
   | ChannelName '(' ChannelName ')' Process IN Process { Fork $1 $3 $5 $7 }
   | ChannelName '<' ChannelName '>' '.' Process
     { let tmp = Identifier (At $ getPos $2) "_tmp_" in
       Fork $1 tmp (Link $3 tmp) $6 }
   | ChannelName '(' ChannelName ')' '.' Process { Join $1 $3 $6 }
-  | ChannelName '[' Label ']' '.' Process { Select $1 $3 $6 }
-  | CASE ChannelName Cases { Case $2 $3 }
+  | ChannelName '◃' Label '.' Process { Select $1 $3 $5 }
+  | ChannelName '▹' Cases { Case $1 $3 }
+  | ChannelName '▹' Label '.' Process { Case $1 [($3, $5)] }
   | NEW '(' ChannelName ':' TypeExpr ')' Process IN Process { Cut $3 $5 $7 $9 }
   | ProcessName Names { Call $1 $2 }
 
