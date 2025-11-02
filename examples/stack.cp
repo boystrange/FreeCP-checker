@@ -1,3 +1,4 @@
+// non-uniform stack
 
 type A = &{ push : ?a; B; A, free : skip }
 type B = &{ push : ?a; B; B, pop  : !a^  }

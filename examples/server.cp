@@ -1,3 +1,5 @@
+// server and finite client
+
 type A = &{ req : A; +{ resp : skip }, stop : skip }
 
 Server(x : A; a, y : !a^; 1) =
