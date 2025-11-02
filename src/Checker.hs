@@ -66,6 +66,9 @@ instantiate ts = do
 
 addTypeConstraint :: TypeName -> TypeM -> Checker ()
 addTypeConstraint tname t = do
+  State.lift $ putStr $ "ADDING TYPE CONSTRAINT FOR " ++ show tname ++ " "
+  State.lift $ Render.printType t
+  State.lift $ putStrLn ""
   (pctxt, tv, mv, tmap, cs) <- State.get
   State.put (pctxt, tv, mv, Map.insert tname t tmap, cs)
 
@@ -373,6 +376,9 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       return (Call pname xs, μ)
     -- Link
     auxP ctx (Link x y) = do
+      State.lift $ putStrLn "LINK"
+      State.lift $ Render.printContext ctx
+      State.lift $ putStrLn ""
       (ctx, t) <- remove ctx x
       (ctx, s) <- remove ctx y
       checkEmpty ctx

@@ -38,33 +38,34 @@ import qualified Data.Set as Set
 -- |Given a list of type definitions and a possibly open type,
 -- create a closed type.
 resolveT :: [TypeDef] -> TypeS -> TypeS
-resolveT tdefs = aux []
+resolveT tdefs = aux False []
   where
-    aux :: [TypeName] -> TypeS -> TypeS
-    aux tnames One  = One
-    aux tnames Bot  = Bot
-    aux tnames Skip = Skip
-    aux tnames (Seq t s) = Seq (aux tnames t) (aux tnames s)
-    aux tnames (Poly d tname) = Poly d tname
-    aux tnames (Var tname) | tname `elem` tnames = Var tname
-    aux tnames (Var tname) =
+    aux :: Bool -> [(Bool, TypeName)] -> TypeS -> TypeS
+    aux _ tnames One  = One
+    aux _ tnames Bot  = Bot
+    aux _ tnames Skip = Skip
+    aux d tnames (Seq t s) = Seq (aux d tnames t) (aux d tnames s)
+    aux _ tnames (Poly d tname) = Poly d tname
+    aux d tnames (Var tname) | (d, tname) `elem` tnames = Var tname
+                             | (not d, tname) `elem` tnames = error "non monotonic type definition"
+    aux d tnames (Var tname) =
       case lookup tname tdefs of
         Nothing -> throw (ErrorUnknownIdentifier "type" (showWithPos tname))
-        Just t  -> let s = aux (tname : tnames) t in
+        Just t  -> let s = aux d ((d, tname) : tnames) t in
                    if Set.member (RecVar tname) (tvars s) then
                       Rec tname s
                     else
                       s
-    aux tnames (Par t s) = Par (aux tnames t) (aux tnames s)
-    aux tnames (Mul t s) = Mul (aux tnames t) (aux tnames s)
-    aux tnames (Plus bs) = Plus (mapSnd (aux tnames) bs)
-    aux tnames (With bs) = With (mapSnd (aux tnames) bs)
-    aux tnames (Put m t) = Put m (aux tnames t)
-    aux tnames (Get m t) = Get m (aux tnames t)
+    aux d tnames (Par t s) = Par (aux d tnames t) (aux d tnames s)
+    aux d tnames (Mul t s) = Mul (aux d tnames t) (aux d tnames s)
+    aux d tnames (Plus bs) = Plus (mapSnd (aux d tnames) bs)
+    aux d tnames (With bs) = With (mapSnd (aux d tnames) bs)
+    aux d tnames (Put m t) = Put m (aux d tnames t)
+    aux d tnames (Get m t) = Get m (aux d tnames t)
+    aux d tnames (Dual t) = dual (aux (not d) tnames t)
 
 resolveE :: [TypeDef] -> TypeE -> TypeS
-resolveE tdefs (Type t) = resolveT tdefs t
-resolveE tdefs (Dual t) = dual (resolveT tdefs t)
+resolveE tdefs t = resolveT tdefs t
 
 -- |Given a list of type definitions and a process, close all types
 -- occurring in the process.

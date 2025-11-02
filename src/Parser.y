@@ -198,7 +198,7 @@ Label
 -- TYPES
 
 TypeExpr
-  : Type { Type $1 }
+  : Type { $1 }
 
 Type
   : Num  { if $1 == 1 then One
@@ -207,7 +207,7 @@ Type
   | TypeName { Var $1 }
   | TypeName '=' Type { Rec $1 $3 }
   | PolyName { Poly False $1 }
-  | '^' Type { Type.dual $2 }
+  | Type '^' { Dual $1 }
   | '(' Type ')' { $2 }
   | Type '*' Type { Mul $1 $3 }
   | Type '|' Type { Par $1 $3 }

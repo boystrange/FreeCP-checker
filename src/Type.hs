@@ -69,10 +69,12 @@ data Type m
   | Plus [(Label, Type m)]
   | Put m (Type m)
   | Get m (Type m)
+  | Dual (Type m)
   deriving (Eq, Ord)
 
 type TypeS = Type (Maybe Int)
-data TypeE = Type TypeS | Dual TypeS
+type TypeE = TypeS
+-- data TypeE = Type TypeS | Dual TypeS
 type TypeM = Type Measure
 
 -- DEFINITIONS

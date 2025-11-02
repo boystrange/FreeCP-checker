@@ -1,12 +1,12 @@
 
 type A = &{ push : ?a; B; A, free : skip }
-type B = &{ push : ?a; B; B, pop  : !a   }
+type B = &{ push : ?a; B; B, pop  : !a^  }
 
-None(x : (A; c), y : (!^c; 1)) =
+None(x : A; c, y : !c^; 1) =
     case x {
         push :
             x(u).
-            new (z : !^(A; c); 1)
+            new (z : !(A; c)^; 1)
                 Some(u, x, z)
             in
                 z(x).
@@ -17,11 +17,11 @@ None(x : (A; c), y : (!^c; 1)) =
             close y
     }
 
-Some(v : a, x : (B; c), y : (!^c; 1)) =
+Some(v : a, x : B; c, y : !c^; 1) =
     case x {
         push :
             x(u).
-            new (z : !(a; B; c); 1)
+            new (z : !(B; c)^; 1)
                 Some(u, x, z)
             in
                 z(x).
