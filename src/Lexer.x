@@ -127,9 +127,6 @@ data TokenClass
   | TokenRec
   | TokenNew
   | TokenIn
-  | TokenClose
-  | TokenWait
-  | TokenCase
   | TokenSkip
   | TokenDual
   | TokenLID String

@@ -43,9 +43,6 @@ import Control.Exception
 
 %token
   TYPE      { Token _ TokenType }
-  WAIT      { Token _ TokenWait }
-  CLOSE     { Token _ TokenClose }
-  CASE      { Token _ TokenCase }
   SKIP      { Token _ TokenSkip }
   NEW       { Token _ TokenNew }
   IN        { Token _ TokenIn }
@@ -153,20 +150,6 @@ Names
 NameNeList
   : ChannelName { [$1] }
   | ChannelName ',' NameNeList { $1 : $3 }
-
-Choices
-  : '{' ChoiceNeList '}' { $2 }
-
-ChoiceNeList
-  : Choice { [$1] }
-  | Choice ',' ChoiceNeList { $1 : $3 }
-
-Choice
-  : WeightOpt Process { ($1, $2) }
-
-WeightOpt
-  :         { 1 }
-  | Num ':' { $1 }
 
 Cases
   : '{' CaseList '}' { $2 }

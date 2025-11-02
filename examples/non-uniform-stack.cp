@@ -12,8 +12,8 @@ None(x : A; c, y : !c^; 1) =
             in
                 z(x).
                 z().
-                None(x, y),
-        free :
+                None(x, y)
+    ,   free :
             y⟨x⟩.
             y[]
     }
@@ -27,8 +27,8 @@ Some(v : a, x : B; c, y : !c^; 1) =
             in
                 z(x).
                 z().
-                Some(v, x, y),
-        pop :
+                Some(v, x, y)
+    ,   pop :
             x⟨v⟩.
             y⟨x⟩.
             y[]
