@@ -95,6 +95,9 @@ unify = mapM_ aux
         auxV (Poly True tname) s = auxT (Type.dual s) (Poly False tname)
         auxV t s@(Poly _ _) = auxT s t
 
+        -- TODO: to implement the occur check correctly we should look at the
+        -- type expanded with all the unifications
+
         -- unification for equi-recursive types
         auxV (Var tname) (Var sname) | tname == sname = return ()
         auxV (Rec tname t) (Rec sname s) | tname == sname = auxT t s
@@ -381,7 +384,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       -- Remove the association for x from the context.
       (ctx, t) <- remove ctx x
       -- Make sure that the type of x is ?end
-      checkTypeEq x Type.Bot (Type.unfold t)
+      checkTypeEq x Type.Bot (Type.normalize t)
       -- Type check the continuation.
       (p', μ) <- auxP ctx p
       return (Wait x p', μ)
@@ -392,7 +395,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       -- Make sure that the remaining context is empty.
       checkEmpty ctx
       -- Make sure that the type of x is !end
-      checkTypeEq x Type.One (Type.unfold t)
+      checkTypeEq x Type.One (Type.normalize t)
       μ <- MRef <$> newMeasureVar
       return (Close x, msucc μ)
     -- Rule [#]
@@ -402,7 +405,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       -- Remove the association for x from the context.
       (ctx, t) <- remove ctx x
       -- Check the shape of the type of x.
-      case Type.unfold t of
+      case Type.normalize t of
         -- If it is the input of a channel, insert the association
         -- for y in the context along with the updated type of x and
         -- type check the continuation.
@@ -419,7 +422,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       (ctx, t) <- remove ctx x
       let (ctxp, ctxq) = partitionContext ctx p q
       -- Check the shape of the type associated with x.
-      case Type.unfold t of
+      case Type.normalize t of
         -- If it is the output of a channel...
         Type.Mul s t' -> do
           ctxp <- insert ctxp y s
@@ -436,9 +439,9 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       State.lift $ putStrLn "SELECT"
       State.lift $ Render.printType t
       State.lift $ putStrLn ""
-      case Type.unfold t of
+      case Type.normalize t of
         s@(Type.Plus bs) -> do
-          State.lift $ putStrLn "SELECT UNFOLDED"
+          State.lift $ putStrLn "SELECT exposeED"
           State.lift $ Render.printType s
           State.lift $ putStrLn ""
           case lookup tag bs of
@@ -454,10 +457,10 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       -- Remove the association for x from the context.
       (ctx, t) <- remove ctx x
       State.lift $ putStrLn "CASE"
-      State.lift $ Render.printType t
+      -- State.lift $ Render.printType t
       State.lift $ putStrLn ""
       -- Check the shape of the type associated with x.
-      case Type.unfold t of
+      case Type.normalize t of
         -- If it is a "with"...
         Type.With bs -> do
           let tmap = Map.fromList bs
@@ -482,7 +485,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
     -- Rule [put]
     auxP ctx (PutGas x p) = do
       (ctx, t) <- remove ctx x
-      case Type.unfold t of
+      case Type.normalize t of
         Type.Put ν s -> do
           ctx <- insert ctx x s
           (p', μ) <- auxP ctx p
@@ -491,7 +494,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
     -- Rule [get]
     auxP ctx (GetGas x p) = do
       (ctx, t) <- remove ctx x
-      case Type.unfold t of
+      case Type.normalize t of
         -- _ -> throw $ ErrorTypeMismatch x "debug" t
         Type.Get ν s -> do
           ctx <- insert ctx x s

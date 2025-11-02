@@ -80,11 +80,13 @@ import Control.Exception
 %nonassoc '}' ']' IN
 
 %right ','
+%nonassoc '='
 %left '+'
 %right ';'
 %left '*' '|'
 %nonassoc '++' '--'
 %nonassoc '?' '!'
+%nonassoc '^'
 
 %%
 
@@ -197,22 +199,22 @@ Label
 
 TypeExpr
   : Type { Type $1 }
-  | '^' Type { Dual $2 }
 
 Type
   : Num  { if $1 == 1 then One
            else error $ (show $1) ++ " is not a type" }
   | '⊥'  { Bot }
   | TypeName { Var $1 }
+  | TypeName '=' Type { Rec $1 $3 }
   | PolyName { Poly False $1 }
-  | '^' PolyName { Poly True $2 }
+  | '^' Type { Type.dual $2 }
   | '(' Type ')' { $2 }
   | Type '*' Type { Mul $1 $3 }
   | Type '|' Type { Par $1 $3 }
   | '!' Type { Mul $2 Skip }
   | '?' Type { Par $2 Skip }
   | SKIP { Skip }
-  | Type ';' Type { Type.qes $3 $1 }
+  | Type ';' Type { Seq $1 $3 }
   | '&' Branches { With $2 }
   | '+' Branches { Plus $2 }
   | '++' MeasureOpt Type { Put $2 $3 }

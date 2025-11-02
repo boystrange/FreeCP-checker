@@ -38,7 +38,7 @@ data TypeVariable = PolyVar TypeName | RecVar TypeName
 
 type TMap m = Map TypeVariable (Type m)
 
-class Ord a => TypeVariables a where
+class TypeVariables a where
   tvars :: a -> Set TypeVariable
   rvars :: a -> Set TypeName
   rvars x = Set.fromList [ tname | RecVar tname <- Set.toList (tvars x) ]
@@ -113,22 +113,7 @@ type TypeDef = (TypeName, TypeS)
 --     aux us (Put _ t) = aux us t
 --     aux us (Get _ t) = aux us t
 
-qes :: Type m -> Type m -> Type m
-qes _ One            = One
-qes _ Bot            = Bot
-qes k Skip           = k
-qes k (Seq t s)      = Seq t (qes k s)
-qes _ (Poly d tname) = Poly d tname
-qes k (Var tname)    = Seq (Var tname) k
-qes k (Rec tname t)  = Seq (Rec tname t) k
-qes k (Par t s)      = Par t (qes k s)
-qes k (Mul t s)      = Mul t (qes k s)
-qes k (With bs)      = With (mapSnd (qes k) bs)
-qes k (Plus bs)      = Plus (mapSnd (qes k) bs)
-qes k (Put m t)      = Put m (qes k t)
-qes k (Get m t)      = Get m (qes k t)
-
-instance Ord m => TypeVariables (Type m) where
+instance TypeVariables (Type m) where
   tvars (Seq t s)      = Set.union (tvars t) (tvars s)
   tvars (Poly _ tname) = Set.singleton (PolyVar tname)
   tvars (Var tname)    = Set.singleton (RecVar tname)
@@ -145,7 +130,7 @@ tsubst :: TypeVariable -> Type m -> Type m -> Type m
 tsubst tname t = tsubsts (Map.singleton tname t)
 
 tsubsts :: TMap m -> Type m -> Type m
-tsubsts tmap (Seq t s)      = qes (tsubsts tmap s) (tsubsts tmap t)
+tsubsts tmap (Seq t s)      = Seq (tsubsts tmap t) (tsubsts tmap s)
 tsubsts tmap (Par t s)      = Par (tsubsts tmap t) (tsubsts tmap s)
 tsubsts tmap (Mul t s)      = Mul (tsubsts tmap t) (tsubsts tmap s)
 tsubsts tmap (Plus bs)      = Plus (mapSnd (tsubsts tmap) bs)
@@ -160,46 +145,62 @@ tsubsts tmap s              = s
 instance TypeVariables a => TypeVariables [a] where
   tvars = Set.unions . map tvars
 
-unfold :: Ord m => Type m -> Type m
-unfold (Seq t s) = qes s (unfold t)
+(|>) :: Type m -> Type m -> Type m
+(|>) One            _ = One
+(|>) Bot            _ = Bot
+(|>) Skip           k = k
+(|>) (Seq t s)      k = t |> (s |> k)
+(|>) (Poly d tname) _ = Poly d tname
+(|>) (Var tname)    k = Seq (Var tname) k
+(|>) (Rec tname t)  k = Seq (Rec tname t) k
+(|>) (Par t s)      k = Par t (s |> k)
+(|>) (Mul t s)      k = Mul t (s |> k)
+(|>) (With bs)      k = With (mapSnd (|> k) bs)
+(|>) (Plus bs)      k = Plus (mapSnd (|> k) bs)
+(|>) (Put m t)      k = Put m (t |> k)
+(|>) (Get m t)      k = Get m (t |> k)
+
+unfold :: Type m -> Type m
+unfold (Seq t s) = unfold (unfold t |> s)
 unfold t@(Rec tname s) = unfold (tsubst (RecVar tname) t s)
 unfold t = t
 
--- hnf :: Ord m => Type m -> Type m
--- hnf t =
---   case unfold t of
---     Seq t1 t2 ->
---       case hnf t1 of
---         Skip -> hnf t2
---         Seq (Poly d tname) s2 -> Seq (Poly d tname) (Seq s2 t2)
---         One -> One
---         Bot -> Bot
---         Mul s1 s2 -> Mul s1 (Seq s2 t2)
---         Par s1 s2 -> Par s1 (Seq s2 t2)
---         Plus bs -> Plus (map (\(l, s) -> (l, Seq s t2)) bs)
---         With bs -> With (map (\(l, s) -> (l, Seq s t2)) bs)
---         Put m s -> Put m (Seq s t2)
---         Get m s -> Get m (Seq s t2)
---         _ -> error "this should be impossible"
---     Poly d tname -> Seq (Poly d tname) Skip
---     Rec _ _ -> error "this should be impossible"
---     Var _ -> error "this should be impossible"
---     s -> s
-
 dual :: Type m -> Type m
-dual One            = Bot
-dual Bot            = One
-dual Skip           = Skip
-dual (Seq t s)      = Seq (dual t) (dual s)
-dual (Poly d tname) = Poly (not d) tname
-dual (Var tname)    = Var tname
-dual (Rec tname t)  = Rec tname (dual t)
-dual (Par t s)      = Mul (dual t) (dual s)
-dual (Mul t s)      = Par (dual t) (dual s)
-dual (With bs)      = Plus (mapSnd dual bs)
-dual (Plus bs)      = With (mapSnd dual bs)
-dual (Put m t)      = Get m (dual t)
-dual (Get m t)      = Put m (dual t)
+dual = aux []
+  where
+    aux _  One            = Bot
+    aux _  Bot            = One
+    aux _  Skip           = Skip
+    aux ds (Seq t s)      = Seq (aux ds t) (aux ds s)
+    aux _  (Poly d tname) = Poly (not d) tname
+    aux ds (Var tname)    | tname `elem` ds = Var tname
+                          | otherwise = error "cannot dualize open type"
+    aux ds (Rec tname t)  = Rec tname (aux (tname : ds) t)
+    aux ds (Par t s)      = Mul (aux ds t) (aux ds s)
+    aux ds (Mul t s)      = Par (aux ds t) (aux ds s)
+    aux ds (With bs)      = Plus (mapSnd (aux ds) bs)
+    aux ds (Plus bs)      = With (mapSnd (aux ds) bs)
+    aux ds (Put m t)      = Get m (aux ds t)
+    aux ds (Get m t)      = Put m (aux ds t)
+
+normalize :: Type m -> Type m
+normalize = go True []
+  where
+    go :: Bool -> [Type m] -> Type m -> Type m
+    go _    _        One             = One
+    go _    _        Bot             = Bot
+    go _    []       Skip            = Skip
+    go unf  (t : ts) Skip            = go unf ts t
+    go unf  ts       (Seq t s)       = go unf (s : ts) t
+    go _    _        (Poly d tname)  = Poly d tname
+    go _    ts       (Mul t s)       = Mul t (go False ts s)
+    go _    ts       (Par t s)       = Par t (go False ts s)
+    go _    ts       (Plus bs)       = Plus (mapSnd (go False ts) bs)
+    go _    ts       (With bs)       = With (mapSnd (go False ts) bs)
+    go _    ts       (Put m t)       = Put m (go False ts t)
+    go _    ts       (Get m t)       = Get m (go False ts t)
+    go True ts       t@(Rec tname s) = go True ts (tsubst (RecVar tname) t s)
+    go _    ts       t@(Rec _ _)     = Seq t (go False ts Skip)
 
 instance Functor Type where
   fmap f One            = One
