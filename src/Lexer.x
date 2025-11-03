@@ -40,8 +40,8 @@ import Control.Monad (liftM)
 
 $digit   = 0-9
 $extra   = [₀-₉⁰-⁹⁺⁻₊₋]
-$alpha   = [A-Za-z]
-@lower   = [a-z]
+$alpha   = [A-Za-zα-ω]
+@lower   = [a-zα-ω]
 @upper   = [A-Z]
 @next    = $alpha | $digit | $extra | \_ | \'
 @lid     = @lower @next*

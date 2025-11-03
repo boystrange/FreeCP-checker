@@ -1,1 +1,1 @@
-Forwarder(x : ?a; !a^; 1) = x(u).x⟨u⟩.x[]
+Forwarder(x : ?α; !α^; 1) = x(u).x⟨u⟩.x[]

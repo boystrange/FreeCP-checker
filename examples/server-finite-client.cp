@@ -2,10 +2,10 @@
 
 type A = &{ req : A; ⊕{ resp : skip }, stop : skip }
 
-Server(x : A; a, y : a^ ⊗ 1) =
+Server(x : A; α, y : α^ ⊗ 1) =
     x▹{
         req :
-            new (z : &{ resp : a^ } ⊗ 1)
+            new (z : &{ resp : α^ } ⊗ 1)
                 Server(x, z)
             in
                 z(x).

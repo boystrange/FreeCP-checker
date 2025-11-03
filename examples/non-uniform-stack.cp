@@ -1,13 +1,13 @@
 // non-uniform stack
 
-type A = &{ push : ?a; B; A, free : skip }
-type B = &{ push : ?a; B; B, pop  : !a^  }
+type A = &{ push : ?α; B; A, free : skip }
+type B = &{ push : ?α; B; B, pop  : !α^  }
 
-None(x : A; c, y : !c^; 1) =
+None(x : A; γ, y : !γ^; 1) =
     x▹{
         push :
             x(u).
-            new (z : !(A; c)^; 1)
+            new (z : !(A; γ)^; 1)
                 Some(u, x, z)
             in
                 z(x).
@@ -18,11 +18,11 @@ None(x : A; c, y : !c^; 1) =
             y[]
     }
 
-Some(v : a, x : B; c, y : !c^; 1) =
+Some(v : α, x : B; γ, y : !γ^; 1) =
     x▹{
         push :
             x(u).
-            new (z : !(B; c)^; 1)
+            new (z : !(B; γ)^; 1)
                 Some(u, x, z)
             in
                 z(x).

@@ -22,7 +22,7 @@
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
 
--- |This module implements the parser for FairCheck scripts.
+-- |This module implements the parser for FreeCP scripts.
 module Parser (parseProcess) where
 
 import Lexer
