@@ -165,22 +165,19 @@ unfold t@(Rec tname s) = unfold (tsubst (RecVar tname) t s)
 unfold t = t
 
 dual :: Type m -> Type m
-dual = aux []
-  where
-    aux _  One            = Bot
-    aux _  Bot            = One
-    aux _  Skip           = Skip
-    aux ds (Seq t s)      = Seq (aux ds t) (aux ds s)
-    aux _  (Poly d tname) = Poly (not d) tname
-    aux ds (Var tname)    | tname `elem` ds = Var tname
-                          | otherwise = error "cannot dualize open type"
-    aux ds (Rec tname t)  = Rec tname (aux (tname : ds) t)
-    aux ds (Par t s)      = Mul (aux ds t) (aux ds s)
-    aux ds (Mul t s)      = Par (aux ds t) (aux ds s)
-    aux ds (With bs)      = Plus (mapSnd (aux ds) bs)
-    aux ds (Plus bs)      = With (mapSnd (aux ds) bs)
-    aux ds (Put m t)      = Get m (aux ds t)
-    aux ds (Get m t)      = Put m (aux ds t)
+dual One            = Bot
+dual Bot            = One
+dual Skip           = Skip
+dual (Seq t s)      = Seq (dual t) (dual s)
+dual (Poly d tname) = Poly (not d) tname
+dual (Var tname)    = Var tname
+dual (Rec tname t)  = Rec tname (dual t)
+dual (Par t s)      = Mul (dual t) (dual s)
+dual (Mul t s)      = Par (dual t) (dual s)
+dual (With bs)      = Plus (mapSnd (dual) bs)
+dual (Plus bs)      = With (mapSnd (dual) bs)
+dual (Put m t)      = Get m (dual t)
+dual (Get m t)      = Put m (dual t)
 
 normalize :: Type m -> Type m
 normalize = go True []
