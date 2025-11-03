@@ -52,9 +52,9 @@ data Process t
   | Case ChannelName [(Label, Process t)]
   -- |Cut.
   | Cut ChannelName t (Process t) (Process t)
-  -- |Put gas
+  -- |Put gas (internal use only)
   | PutGas ChannelName (Process t)
-  -- |Get gas
+  -- |Get gas (internal use only)
   | GetGas ChannelName (Process t)
   deriving (Eq, Ord)
 

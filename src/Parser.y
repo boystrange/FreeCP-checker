@@ -49,7 +49,6 @@ import Control.Exception
   CID       { $$@(Token _ (TokenCID _)) }
   LID       { $$@(Token _ (TokenLID _)) }
   INT       { $$@(Token _ (TokenINT _)) }
-  FLOAT     { $$@(Token _ (TokenFLOAT _)) }
   '='       { Token _ TokenEQ }
   '.'       { Token _ TokenDot }
   ':'       { Token _ TokenColon }
@@ -68,8 +67,6 @@ import Control.Exception
   '⊥'       { Token _ TokenBot }
   '*'       { Token _ TokenTimes }
   '+'       { Token _ TokenPlus }
-  '++'      { Token _ TokenPut }
-  '--'      { Token _ TokenGet }
   '?'       { Token _ TokenQMark }
   '!'       { Token _ TokenEMark }
   '^'       { Token _ TokenDual }
@@ -201,19 +198,10 @@ Type
   | Type ';' Type { Seq $1 $3 }
   | '&' Branches { With $2 }
   | '+' Branches { Plus $2 }
-  | '++' MeasureOpt Type { Put $2 $3 }
-  | '--' MeasureOpt Type { Get $2 $3 }
-
-MeasureOpt
-  : { Nothing }
-  | '[' Int ']' { Just $2 }
 
 Num : Int { fromIntegral $1 }
-  | Float { $1 }
 
 Int : INT { getInt $1 }
-
-Float : FLOAT { getFloat $1 }
 
 Branches
   : '{' BranchList '}' { $2 }

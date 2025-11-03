@@ -47,8 +47,7 @@ $alpha   = [A-Za-zα-ω]
 @lid     = @lower @next*
 @cid     = @upper @next*
 @int     = $digit+
-@float   = (@int \. @int) | (@int \. @int)
-@num     = @int | @float
+@num     = @int
 @string  = \"[^\"]*\"
 
 tokens :-
@@ -80,8 +79,6 @@ tokens :-
   "?"     { lex' TokenQMark       }
   "!"     { lex' TokenEMark       }
   "^"     { lex' TokenDual        }
-  "++"    { lex' TokenPut         }
-  "--"    { lex' TokenGet         }
   "▹"    { lex' TokenRTriangle   }
   "◃"    { lex' TokenLTriangle   }
   "|>"    { lex' TokenRTriangle   }
@@ -91,7 +88,6 @@ tokens :-
   @lid    { lex lookupLID         }
   @cid    { lex TokenCID          }
   @int    { lex (TokenINT . read) }
-  @float  { lex (TokenFLOAT .read) }
 
 {
 -- To improve error messages, We keep the path of the file we are
@@ -153,12 +149,6 @@ data TokenClass
   | TokenRAngle
   | TokenQMark
   | TokenEMark
-  | TokenLow
-  | TokenHigh
-  | TokenPut
-  | TokenGet
-  | TokenPutGas
-  | TokenGetGas
   | TokenLTriangle
   | TokenRTriangle
   | TokenLRArrow
