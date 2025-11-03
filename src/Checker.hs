@@ -80,11 +80,11 @@ unify = mapM_ aux
       where
         auxT :: TypeM -> TypeM -> Checker ()
         auxT t s = do
-          -- State.lift $ putStrLn "UNIFY"
-          -- State.lift $ Render.printType t
-          -- State.lift $ putStrLn "\nAND"
-          -- State.lift $ Render.printType s
-          -- State.lift $ putStrLn "\n"
+          State.lift $ putStr "UNIFY "
+          State.lift $ Render.printType t
+          State.lift $ putStr "\nAND   "
+          State.lift $ Render.printType s
+          State.lift $ putStrLn "\n"
           tf <- find t
           sf <- find s
           auxV tf sf
