@@ -66,9 +66,9 @@ data Type m
   | Mul (Type m) (Type m)
   | With [(Label, Type m)]
   | Plus [(Label, Type m)]
-  | Put m (Type m)
-  | Get m (Type m)
-  | Dual (Type m)
+  | Put m (Type m) -- internal use only
+  | Get m (Type m) -- internal use only
+  | Dual (Type m)  -- internal use only
   deriving (Eq, Ord)
 
 type TypeS = Type ()
