@@ -323,10 +323,10 @@ insert ctx x t =
 -- | Check that all process definitions are well typed. The first
 -- argument is the subtyping relation being used, so that it is
 -- possible to choose among fair and unfair subtyping.
-checkTypes :: [ProcessDefS] -> IO ([MeasureConstraint], [ProcessDef])
+checkTypes :: [ProcessDefS] -> IO (TypeContext, [MeasureConstraint], [ProcessDef])
 checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, toEnum 0, Map.empty, [])
   where
-    checkProgram :: [ProcessDefS] -> Checker ([MeasureConstraint], [ProcessDef])
+    checkProgram :: [ProcessDefS] -> Checker (TypeContext, [MeasureConstraint], [ProcessDef])
     checkProgram pdefs = do
       pdefs <- mapM (\(pname, xts, p) -> do
                         ctx <- addProcess pname xts
@@ -338,8 +338,8 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
                         addMeasureConstraintLe ν μ
                         return (pname, μ, zip (map fst xts) ts, p')
                     ) pdefs
-      (_, _, _, _, cs) <- State.get
-      return (cs, pdefs)
+      (_, _, _, tmap, cs) <- State.get
+      return (tmap, cs, pdefs)
 
     -- Check that the context is empty. If not, there are some
     -- channels left unused.

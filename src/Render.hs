@@ -121,8 +121,8 @@ instance Show Measure where
   show (MSub m n) = show m ++ " - " ++ if atom n then show n else "(" ++ show n ++ ")"
 
 instance Show MeasureConstraint where
-  show (CEq m n) = show m ++ " == " ++ show n
-  show (CLe m n) = show m ++ " <= " ++ show n
+  show (CEq m n) = show m ++ " = " ++ show n
+  show (CLe m n) = show m ++ " ≤ " ++ show n
 
 prettyMeasure :: Measure -> Document
 prettyMeasure = annotate (PT.color PT.Green) . pretty . show
@@ -195,8 +195,8 @@ prettyProcess = go
     go (Select x tag p) = identifier (show x) <> operator "◃" <> identifier (show tag) <> Render.dot <> go p
     go (Case x bs) = identifier (show x) <> operator "▹" <> embrace lbrace rbrace comma (map goCase bs)
     go (Cut x t p q) = keyword "new" <+> parens (identifier (show x) <+> colon <+> prettyType prettyMeasure t) <> encloseSep lparen rparen (space <> bar <> space) [go p, go q]
-    go (PutGas x p) = keyword "put" <+> identifier (show x) <> semi <+> go p
-    go (GetGas x p) = keyword "get" <+> identifier (show x) <> semi <+> go p
+    go (PutGas x p) = keyword "put" <+> identifier (show x) <> Render.dot <> go p
+    go (GetGas x p) = keyword "get" <+> identifier (show x) <> Render.dot <> go p
 
     goCase (tag, p) = identifier (show tag) <+> colon <+> go p
 

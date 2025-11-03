@@ -72,11 +72,17 @@ main = do
             hFlush stdout)
       start <- getCurrentTime
       let pdefs = Instrumenter.instrument pdefs0
-      (cs0, pdefs'') <- Checker.checkTypes pdefs
-      let cs = cs0
-      let pdefs' = pdefs''
+      (tmap, cs, pdefs') <- Checker.checkTypes pdefs
       forM_ pdefs' printProcessDec
-      when verbose (forM_ cs (\c -> putStrLn $ "  " ++ show c))
+      when verbose $ do
+        putStrLn "\n=== TYPE CONSTRAINTS ===\n"
+        (forM_ (Map.toList tmap) (\(tname, t) -> do
+                                    putStr $ show tname ++ " = "
+                                    Render.printType t
+                                    putStrLn ""))
+      when verbose $ do
+        putStrLn "\n=== MEASURE CONSTRAINTS ===\n"
+        (forM_ cs (\c -> putStrLn $ "  " ++ show c))
       when True
         (do let μs = Set.toList (mvars cs)
             case Solver.solve μs cs of
