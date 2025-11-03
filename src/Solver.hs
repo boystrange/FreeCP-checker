@@ -91,7 +91,6 @@ solve μs cs =
         auxM (MRef i) = z1 i
         auxM (MAdd m n) = auxM m .+. auxM n
         auxM (MSub m n) = auxM m .-. auxM n
-        -- auxM (MMul w m) = R w *. auxM m
 
     constraint :: MyConstraint
     constraint = foldl (:&&) CTrue constraints
@@ -100,19 +99,4 @@ solve μs cs =
     bounds = map (lowerZ 0) μs
 
     assigned :: MyAssignment -> Int -> Int
-    assigned ass i = -- unwrapR $ rOf ass (toEnum i)
-      fromIntegral $ zOf ass (toEnum i)
-
-    -- aux :: MyAssignment -> ProcessDefM -> ProcessDefI
-    -- aux ass (pname, m, us, _) = (pname, auxM ass m, map (auxB ass) us, Nothing)
-
-    -- auxM :: MyAssignment -> Measure -> Int
-    -- auxM ass (MCon k) = k
-    -- auxM ass (MRef i) = assigned ass i
-    -- auxM ass (MAdd m n) = auxM ass m + auxM ass n
-
-    -- auxB :: MyAssignment -> (ChannelName, TypeM) -> (ChannelName, TypeS)
-    -- auxB ass (x, t) = (x, auxT ass t)
-
-    -- auxT :: MyAssignment -> TypeM -> TypeS
-    -- auxT ass = fmap (auxM ass)
+    assigned ass i = fromIntegral $ zOf ass (toEnum i)

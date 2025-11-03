@@ -44,7 +44,6 @@ data Measure
   | MRef MVar
   | MAdd Measure Measure
   | MSub Measure Measure
-  | MMul Double Measure
   deriving (Eq, Ord)
 
 mzero :: Measure
@@ -72,7 +71,6 @@ instance MeasureVariables Measure where
   mvars (MRef x) = Set.singleton x
   mvars (MAdd m n) = Set.union (mvars m) (mvars n)
   mvars (MSub m n) = Set.union (mvars m) (mvars n)
-  mvars (MMul w m) = mvars m
 
 instance MeasureVariables MeasureConstraint where
   mvars (CEq m n) = Set.union (mvars m) (mvars n)

@@ -1,6 +1,6 @@
 YAML    = stack.yaml
-TESTS   = $(wildcard examples/*.pi)
-ERRORS  = $(wildcard errors/*.pi)
+TESTS   = $(wildcard examples/*.cp)
+ERRORS  = $(wildcard errors/*.cp)
 DEST    =
 STACK   = stack --stack-yaml $(YAML)
 NULL    =
@@ -51,7 +51,7 @@ check_examples:
 	@for i in $(TESTS); do make -s $$i.check_ok; done
 
 %.check:
-	@faircheck --log $(@:%.check=%) || echo
+	@stack run $(@:%.check=%) || echo
 
 check_errors:
 	@echo

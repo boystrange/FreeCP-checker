@@ -66,9 +66,9 @@ instantiate ts = do
 
 addTypeConstraint :: TypeName -> TypeM -> Checker ()
 addTypeConstraint tname t = do
-  State.lift $ putStr $ "ADDING TYPE CONSTRAINT FOR " ++ show tname ++ " "
-  State.lift $ Render.printType t
-  State.lift $ putStrLn ""
+  -- State.lift $ putStr $ "ADDING TYPE CONSTRAINT FOR " ++ show tname ++ " "
+  -- State.lift $ Render.printType t
+  -- State.lift $ putStrLn ""
   (pctxt, tv, mv, tmap, cs) <- State.get
   State.put (pctxt, tv, mv, Map.insert tname t tmap, cs)
 
@@ -80,11 +80,11 @@ unify = mapM_ aux
       where
         auxT :: TypeM -> TypeM -> Checker ()
         auxT t s = do
-          State.lift $ putStrLn "UNIFY"
-          State.lift $ Render.printType t
-          State.lift $ putStrLn "\nAND"
-          State.lift $ Render.printType s
-          State.lift $ putStrLn "\n"
+          -- State.lift $ putStrLn "UNIFY"
+          -- State.lift $ Render.printType t
+          -- State.lift $ putStrLn "\nAND"
+          -- State.lift $ Render.printType s
+          -- State.lift $ putStrLn "\n"
           tf <- find t
           sf <- find s
           auxV tf sf
@@ -367,17 +367,10 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       (μ, ts) <- getProcess pname
       unless (length ts == length xs) $ throw $ ErrorArityMismatch pname (length ts) (length xs)
       let ctx' = Map.fromList (zip xs ts)
-      State.lift $ Render.printContext ctx
-      State.lift $ putStrLn ""
-      State.lift $ Render.printContext ctx'
-      State.lift $ putStrLn ""
       checkContextSub ctx' ctx
       return (Call pname xs, μ)
     -- Link
     auxP ctx (Link x y) = do
-      State.lift $ putStrLn "LINK"
-      State.lift $ Render.printContext ctx
-      State.lift $ putStrLn ""
       (ctx, t) <- remove ctx x
       (ctx, s) <- remove ctx y
       checkEmpty ctx
@@ -441,14 +434,8 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
     -- Rule [⊕]
     auxP ctx (Select x tag p) = do
       (ctx, t) <- remove ctx x
-      State.lift $ putStrLn "SELECT"
-      State.lift $ Render.printType t
-      State.lift $ putStrLn ""
       case Type.normalize t of
         s@(Type.Plus bs) -> do
-          State.lift $ putStrLn "SELECT exposeED"
-          State.lift $ Render.printType s
-          State.lift $ putStrLn ""
           case lookup tag bs of
             Just sk -> do
               ctx <- insert ctx x sk
@@ -461,9 +448,6 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       μ <- MRef <$> newMeasureVar
       -- Remove the association for x from the context.
       (ctx, t) <- remove ctx x
-      State.lift $ putStrLn "CASE"
-      -- State.lift $ Render.printType t
-      State.lift $ putStrLn ""
       -- Check the shape of the type associated with x.
       case Type.normalize t of
         -- If it is a "with"...
