@@ -146,8 +146,8 @@ unify = mapM_ aux
 checkTypeEq :: ChannelName -> TypeM -> TypeM -> Checker ()
 checkTypeEq x t s = unify [(x, t, s)]
 
-checkContextSub :: Context -> Context -> Checker ()
-checkContextSub ctx1 ctx2 = do
+checkContextEq :: Context -> Context -> Checker ()
+checkContextEq ctx1 ctx2 = do
   let uset = Map.keysSet ctx1
   let vset = Map.keysSet ctx2
   unless (uset == vset) $ throw $ ErrorLinearity $ Set.elems $ Set.union (Set.difference uset vset) (Set.difference vset uset)
@@ -367,7 +367,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       (μ, ts) <- getProcess pname
       unless (length ts == length xs) $ throw $ ErrorArityMismatch pname (length ts) (length xs)
       let ctx' = Map.fromList (zip xs ts)
-      checkContextSub ctx' ctx
+      checkContextEq ctx' ctx
       return (Call pname xs, μ)
     -- Link
     auxP ctx (Link x y) = do

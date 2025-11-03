@@ -187,13 +187,13 @@ prettyProcess :: ProcessM -> Document
 prettyProcess = go
   where
     go (Call pname xs) = identifier (show pname) <> encloseSep lparen rparen comma (map (identifier . show) xs)
-    go (Link x y) = identifier (show x) <+> operator "=" <+> identifier (show y)
-    go (Close x) = keyword "close" <+> identifier (show x)
-    go (Wait x p) = keyword "wait" <+> identifier (show x) <> semi <+> go p
+    go (Link x y) = identifier (show x) <+> operator "↔" <+> identifier (show y)
+    go (Close x) = identifier (show x) <> brackets emptyDoc
+    go (Wait x p) = identifier (show x) <> parens emptyDoc <> Render.dot <> go p
     go (Fork x y p q) = identifier (show x) <> parens (identifier (show y)) <+> go p <+> keyword "in" <+> go q
-    go (Join x y p) = identifier (show x) <> parens (identifier (show y)) <> semi <+> go p
-    go (Select x tag p) = identifier (show x) <> Render.dot <> identifier (show tag) <> semi <+> go p
-    go (Case x bs) = keyword "case" <+> identifier (show x) <+> embrace lbrace rbrace comma (map goCase bs)
+    go (Join x y p) = identifier (show x) <> parens (identifier (show y)) <> Render.dot <> go p
+    go (Select x tag p) = identifier (show x) <> operator "◃" <> identifier (show tag) <> Render.dot <> go p
+    go (Case x bs) = identifier (show x) <> operator "▹" <> embrace lbrace rbrace comma (map goCase bs)
     go (Cut x t p q) = keyword "new" <+> parens (identifier (show x) <+> colon <+> prettyType prettyMeasure t) <> encloseSep lparen rparen (space <> bar <> space) [go p, go q]
     go (PutGas x p) = keyword "put" <+> identifier (show x) <> semi <+> go p
     go (GetGas x p) = keyword "get" <+> identifier (show x) <> semi <+> go p
