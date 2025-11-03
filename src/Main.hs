@@ -73,9 +73,6 @@ main = do
       start <- getCurrentTime
       let pdefs = Instrumenter.instrument pdefs0
       (cs0, pdefs'') <- Checker.checkTypes pdefs
-      -- let (σ, cs1) = Measure.gatherSubstitutions cs0
-      -- let cs = map (subst σ) cs1
-      -- let pdefs' = map (substProcessDef σ) pdefs''
       let cs = cs0
       let pdefs' = pdefs''
       forM_ pdefs' printProcessDec
@@ -90,9 +87,6 @@ main = do
         )
       stop <- getCurrentTime
       when logging $ printOK (Just (show (diffUTCTime stop start)))
-      -- case Solver.solve pdefs cs of
-      --   Nothing -> printNO "fair termination checker failed"
-      --   Just pdefs' -> forM_ pdefs' printProcessDec
 
     handler :: [Flag] -> MyException -> IO ()
     handler _ e = printNO (show e)

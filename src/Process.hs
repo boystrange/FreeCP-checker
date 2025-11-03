@@ -81,31 +81,3 @@ type ProcessM = Process TypeM
 
 type ProcessDefS = (ProcessName, [(ChannelName, TypeS)], ProcessS)
 type ProcessDef = (ProcessName, Measure, [(ChannelName, TypeM)], ProcessM)
-
-isThread :: ChannelName -> Process t -> Bool
-isThread x (Link y z) = x == y || x == z
-isThread x (Close y) = x == y
-isThread x (Wait y _) = x == y
-isThread x (Fork y _ _ _) = x == y
-isThread x (Join y _ _) = x == y
-isThread x (Select y _ _) = x == y
-isThread x (Case y _) = x == y
-isThread x (PutGas y _) = x == y
-isThread x (GetGas y _) = x == y
-isThread _ _ = False
-
-instance Functor Process where
-  fmap f (Call pname xs) = Call pname xs
-  fmap f (Link x y) = Link x y
-  fmap f (Wait x p) = Wait x (fmap f p)
-  fmap f (Close x) = Close x
-  fmap f (Fork x y p q) = Fork x y (fmap f p) (fmap f q)
-  fmap f (Join x y p) = Join x y (fmap f p)
-  fmap f (Select x l p) = Select x l (fmap f p)
-  fmap f (Case x bs) = Case x (mapSnd (fmap f) bs)
-  fmap f (Cut x t p q) = Cut x (f t) (fmap f p) (fmap f q)
-  fmap f (PutGas x p) = PutGas x (fmap f p)
-  fmap f (GetGas x p) = GetGas x (fmap f p)
-
-substProcessDef :: MSubst -> ProcessDef -> ProcessDef
-substProcessDef σ (pname, μ, xts, p) = (pname, msubst σ μ, mapSnd (msubst σ) xts, fmap (msubst σ) p)

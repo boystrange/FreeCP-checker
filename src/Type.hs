@@ -55,7 +55,6 @@ instance Enum TVar where
 -- types explicitly in a closed form that is easier to convert into regular
 -- trees.
 data Type m
-  -- |Constants
   = One
   | Bot
   | Skip
@@ -202,21 +201,6 @@ normalize = go True []
     go True ts       t@(Rec tname s) = go True ts (tsubst (RecVar tname) t s)
     go _    ts       t@(Rec _ _)     = Seq t (go False ts Skip)
 
-instance Functor Type where
-  fmap f One            = One
-  fmap f Bot            = Bot
-  fmap f Skip           = Skip
-  fmap f (Seq t s)      = Seq (fmap f t) (fmap f s)
-  fmap f (Poly d tname) = Poly d tname
-  fmap f (Var tname)    = Var tname
-  fmap f (Rec tname t)  = Rec tname (fmap f t)
-  fmap f (Par t s)      = Par (fmap f t) (fmap f s)
-  fmap f (Mul t s)      = Mul (fmap f t) (fmap f s)
-  fmap f (With bs)      = With (mapSnd (fmap f) bs)
-  fmap f (Plus bs)      = Plus (mapSnd (fmap f) bs)
-  fmap f (Put m t)      = Put (f m) (fmap f t)
-  fmap f (Get m t)      = Get (f m) (fmap f t)
-
 instance MeasureVariables t => MeasureVariables (Type t) where
   mvars One            = Set.empty
   mvars Bot            = Set.empty
@@ -231,4 +215,3 @@ instance MeasureVariables t => MeasureVariables (Type t) where
   mvars (Plus bs)      = Set.unions (map (mvars . snd) bs)
   mvars (Put m t)      = Set.union (mvars m) (mvars t)
   mvars (Get m t)      = Set.union (mvars m) (mvars t)
-  msubst = fmap . msubst
