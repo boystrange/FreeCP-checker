@@ -64,12 +64,9 @@ resolveT tdefs = aux False []
     aux d tnames (Get m t) = Get m (aux d tnames t)
     aux d tnames (Dual t) = dual (aux (not d) tnames t)
 
-resolveE :: [TypeDef] -> TypeE -> TypeS
-resolveE tdefs t = resolveT tdefs t
-
 -- |Given a list of type definitions and a process, close all types
 -- occurring in the process.
-resolveP :: [TypeDef] -> ProcessE -> ProcessS
+resolveP :: [TypeDef] -> ProcessS -> ProcessS
 resolveP tdefs = aux
   where
     aux (Link x y)       = Link x y
@@ -80,17 +77,17 @@ resolveP tdefs = aux
     aux (Join x y p)     = Join x y (aux p)
     aux (Select x tag p) = Select x tag (aux p)
     aux (Case x bs)      = Case x (mapSnd aux bs)
-    aux (Cut x t p q)    = Cut x (resolveE tdefs t) (aux p) (aux q)
+    aux (Cut x t p q)    = Cut x (resolveT tdefs t) (aux p) (aux q)
     aux (PutGas x p)     = PutGas x (aux p)
     aux (GetGas x p)     = GetGas x (aux p)
 
 -- |Given a list of type definitions and a list of process
 -- definitions, close all process definitions.
-resolve :: [TypeDef] -> [ProcessDefE] -> [ProcessDefS]
+resolve :: [TypeDef] -> [ProcessDefS] -> [ProcessDefS]
 resolve tdefs = map auxD
   where
-    auxD :: ProcessDefE -> ProcessDefS
+    auxD :: ProcessDefS -> ProcessDefS
     auxD (pname, xts, p) = (pname, map (uncurry auxT) xts, resolveP tdefs p)
 
-    auxT :: ChannelName -> TypeE -> (ChannelName, TypeS)
-    auxT x t = (x, resolveE tdefs t)
+    auxT :: ChannelName -> TypeS -> (ChannelName, TypeS)
+    auxT x t = (x, resolveT tdefs t)

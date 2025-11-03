@@ -136,8 +136,8 @@ prettyLabel = identifier . show
 -- TYPE VARIABLES
 
 instance Show TVar where
-  show (TVar n) | major == 0 = [letters!!minor]
-                | otherwise  = letters!!minor : sub major
+  show (TVar n) | major == 0 = ['_', letters!!minor]
+                | otherwise  = '_' : letters!!minor : sub major
     where
       letters = ['α'..'ε']
       max = length letters

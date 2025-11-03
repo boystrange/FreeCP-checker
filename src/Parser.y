@@ -122,7 +122,7 @@ ParameterNeList
   | ParameterNeList ',' ParameterNeList { $1 ++ $3 }
 
 Parameter
-  : ChannelName ':' TypeExpr { ($1, $3) }
+  : ChannelName ':' Type { ($1, $3) }
 
 -- PROCESSES
 
@@ -139,7 +139,7 @@ Process
   | ChannelName '◃' Label '.' Process { Select $1 $3 $5 }
   | ChannelName '▹' Cases { Case $1 $3 }
   | ChannelName '▹' Label '.' Process { Case $1 [($3, $5)] }
-  | NEW '(' ChannelName ':' TypeExpr ')' Process IN Process { Cut $3 $5 $7 $9 }
+  | NEW '(' ChannelName ':' Type ')' Process IN Process { Cut $3 $5 $7 $9 }
   | ProcessName Names { Call $1 $2 }
 
 Names
@@ -183,9 +183,6 @@ Label
   : LID { Identifier (At $ getPos $1) (getId $1) :: Label }
 
 -- TYPES
-
-TypeExpr
-  : Type { $1 }
 
 Type
   : Num  { if $1 == 1 then One
@@ -260,6 +257,6 @@ lexwrap = (alexMonadScan' >>=)
 happyError :: Token -> Alex a
 happyError (Token p t) = alexError' p ("parse error at token '" ++ show t ++ "'")
 
-parseProcess :: FilePath -> String -> Either String ([TypeDef], [ProcessDefE])
+parseProcess :: FilePath -> String -> Either String ([TypeDef], [ProcessDefS])
 parseProcess = runAlex' parse
 }
