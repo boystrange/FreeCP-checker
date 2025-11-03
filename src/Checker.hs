@@ -213,8 +213,7 @@ annotateType = aux
       t' <- aux t
       return (tag, t')
 
-    auxM Nothing = MRef <$> newMeasureVar
-    auxM (Just n) = return $ MCon n
+    auxM () = MRef <$> newMeasureVar
 
 annotateProcess :: ProcessS -> Checker ProcessM
 annotateProcess = go

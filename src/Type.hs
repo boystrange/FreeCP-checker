@@ -71,7 +71,7 @@ data Type m
   | Dual (Type m)
   deriving (Eq, Ord)
 
-type TypeS = Type (Maybe Int)
+type TypeS = Type ()
 type TypeM = Type Measure
 
 -- DEFINITIONS
