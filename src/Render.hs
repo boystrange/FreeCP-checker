@@ -159,10 +159,8 @@ prettyType prettyMeasure = annotate (PT.colorDull PT.Cyan) . aux
     aux (Mul t s) = parens (aux t <+> operator "⊗" <+> aux s)
     aux (Plus bs) = operator "⊕" <> embrace lbrace rbrace comma (map auxB bs)
     aux (With bs) = operator "&" <> embrace lbrace rbrace comma (map auxB bs)
-    aux (Put m t) = operator "++" <> brackets (prettyMeasure m) <+> aux t
-    aux (Get m t) = operator "--" <> brackets (prettyMeasure m) <+> aux t
 
-    auxB (tag, t) = constant (show tag) <+> colon <+> aux t
+    auxB (tag, (m, t)) = constant (show tag) <> brackets (prettyMeasure m) <+> colon <+> aux t
 
 prettyContext :: (m -> Document) -> Map ChannelName (Type m)  -> Document
 prettyContext prettyMeasure ctx = embrace lbrace rbrace comma (map prettyBind (Map.toList ctx))
@@ -195,8 +193,6 @@ prettyProcess = go
     go (Select x tag p) = identifier (show x) <> operator "◃" <> identifier (show tag) <> Render.dot <> go p
     go (Case x bs) = identifier (show x) <> operator "▹" <> embrace lbrace rbrace comma (map goCase bs)
     go (Cut x t p q) = keyword "new" <+> parens (identifier (show x) <+> colon <+> prettyType prettyMeasure t) <> encloseSep lparen rparen (space <> bar <> space) [go p, go q]
-    go (PutGas x p) = keyword "put" <+> identifier (show x) <> Render.dot <> go p
-    go (GetGas x p) = keyword "get" <+> identifier (show x) <> Render.dot <> go p
 
     goCase (tag, p) = identifier (show tag) <+> colon <+> go p
 

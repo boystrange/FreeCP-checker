@@ -58,11 +58,13 @@ resolveT tdefs = aux False []
                       s
     aux d tnames (Par t s) = Par (aux d tnames t) (aux d tnames s)
     aux d tnames (Mul t s) = Mul (aux d tnames t) (aux d tnames s)
-    aux d tnames (Plus bs) = Plus (mapSnd (aux d tnames) bs)
-    aux d tnames (With bs) = With (mapSnd (aux d tnames) bs)
-    aux d tnames (Put m t) = Put m (aux d tnames t)
-    aux d tnames (Get m t) = Get m (aux d tnames t)
+    aux d tnames (Plus bs) = Plus (map (auxB d tnames) bs)
+    aux d tnames (With bs) = With (map (auxB d tnames) bs)
+    -- aux d tnames (Put m t) = Put m (aux d tnames t)
+    -- aux d tnames (Get m t) = Get m (aux d tnames t)
     aux d tnames (Dual t) = dual (aux (not d) tnames t)
+
+    auxB d tnames (l, (m, t)) = (l, (m, aux d tnames t))
 
 -- |Given a list of type definitions and a process, close all types
 -- occurring in the process.
@@ -78,8 +80,8 @@ resolveP tdefs = aux
     aux (Select x tag p) = Select x tag (aux p)
     aux (Case x bs)      = Case x (mapSnd aux bs)
     aux (Cut x t p q)    = Cut x (resolveT tdefs t) (aux p) (aux q)
-    aux (PutGas x p)     = PutGas x (aux p)
-    aux (GetGas x p)     = GetGas x (aux p)
+    -- aux (PutGas x p)     = PutGas x (aux p)
+    -- aux (GetGas x p)     = GetGas x (aux p)
 
 -- |Given a list of type definitions and a list of process
 -- definitions, close all process definitions.

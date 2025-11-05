@@ -215,7 +215,7 @@ BranchNeList
   | Branch ',' BranchNeList { $1 : $3 }
 
 Branch
-  : Label ':' Type { ($1, $3) }
+  : Label ':' Type { ($1, ((), $3)) }
 
 {
 -- external :: Type -> Type -> Type

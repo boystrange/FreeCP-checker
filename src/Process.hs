@@ -52,10 +52,6 @@ data Process t
   | Case ChannelName [(Label, Process t)]
   -- |Cut.
   | Cut ChannelName t (Process t) (Process t)
-  -- |Put gas (internal use only)
-  | PutGas ChannelName (Process t)
-  -- |Get gas (internal use only)
-  | GetGas ChannelName (Process t)
   deriving (Eq, Ord)
 
 -- |Set of channel names occurring free in a process.
@@ -69,8 +65,6 @@ fn (Join x y p) = Set.insert x (Set.delete y (fn p))
 fn (Select x l p) = Set.insert x (fn p)
 fn (Case x gs) = Set.insert x (Set.unions (map (fn . snd) gs))
 fn (Cut x _ p q) = Set.delete x (Set.union (fn p) (fn q))
-fn (PutGas x p) = Set.insert x (fn p)
-fn (GetGas x p) = Set.insert x (fn p)
 
 -- | A __process definition__ is a triple made of a process name, a
 -- list of name declarations and an optional process body. When the

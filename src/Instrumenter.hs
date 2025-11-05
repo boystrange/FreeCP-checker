@@ -32,27 +32,13 @@ instrument :: [ProcessDefS] -> [ProcessDefS]
 instrument = map goD
   where
     goD :: ProcessDefS -> ProcessDefS
-    goD (pname, xts, p) = (pname, mapSnd goT xts, goP p)
+    goD (pname, xts, p) = (pname, xts, goP p)
 
     goP :: ProcessS -> ProcessS
     goP (Wait x p) = Wait x (goP p)
     goP (Fork x y p q) = Fork x y (goP p) (goP q)
     goP (Join x y p) = Join x y (goP p)
-    goP (Select x tag p) = Select x tag (PutGas x (goP p))
+    goP (Select x tag p) = Select x tag (goP p)
     goP (Case x bs) = Case x (mapSnd (GetGas x . goP) bs)
-    goP (Cut x t p q) = Cut x (goT t) (goP p) (goP q)
-    goP (PutGas x p) = PutGas x (goP p)
-    goP (GetGas x p) = GetGas x (goP p)
+    goP (Cut x t p q) = Cut x t (goP p) (goP q)
     goP p = p
-
-    goT :: TypeS -> TypeS
-    goT (Var tname) = Var tname
-    goT (Rec tname t) = Rec tname (goT t)
-    goT (Seq t s) = Seq (goT t) (goT s)
-    goT (Par t s) = Par (goT t) (goT s)
-    goT (Mul t s) = Mul (goT t) (goT s)
-    goT (With bs) = With (mapSnd (Get () . goT) bs)
-    goT (Plus bs) = Plus (mapSnd (Put () . goT) bs)
-    goT (Put m t) = Put m (goT t)
-    goT (Get m t) = Get m (goT t)
-    goT t = t
