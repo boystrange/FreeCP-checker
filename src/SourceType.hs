@@ -53,22 +53,22 @@ import Control.Monad (forM_)
 -- paper, we also provide a 'Rec' constructor to represent recursive session
 -- types explicitly in a closed form that is easier to convert into regular
 -- trees.
-data SourceType
+data Type
   = One
   | Bot
   | Skip
-  | Seq SourceType SourceType
+  | Seq Type Type
   | Poly Bool TypeName
   | Ref TypeName [TypeName]
-  | Par SourceType SourceType
-  | Mul SourceType SourceType
-  | With [(Label, SourceType)]
-  | Plus [(Label, SourceType)]
-  | Dual SourceType
+  | Par Type Type
+  | Mul Type Type
+  | With [(Label, Type)]
+  | Plus [(Label, Type)]
+  | Dual Type
   deriving (Eq, Ord)
 
 -- |A type definition is a pair consisting of a type name and a session type.
-type SourceTypeDef = (TypeName, ([TypeName], SourceType))
+type TypeDef = (TypeName, ([TypeName], Type))
 
 -- instance TypeVariables SourceType where
 --   tvars (Seq t s)      = Set.union (tvars t) (tvars s)

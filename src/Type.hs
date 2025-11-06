@@ -26,11 +26,15 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Control.Monad.State.Lazy (StateT)
+import qualified Control.Monad.State.Lazy as State
 
+import Atoms
+import Measure
 import qualified SourceType as S
 
 data Type
-    = Ref Bool (Ptr Type)
+    = Ref Bool Ptr
     | Bot
     | One
     | Skip
@@ -106,15 +110,14 @@ dual (Par t s) = Mul (dual t) (dual s)
 dual (With bs) = Plus (map (\(l, (m, t)) -> (l, (m, dual t))) bs)
 dual (Plus bs) = With (map (\(l, (m, t)) -> (l, (m, dual t))) bs)
 
-complete :: Type -> HeapT Bool
+complete :: Type -> HeapT m Bool
 complete = fold aux True
     where
-        aux :: (Ptr -> HeapT Bool) -> Type -> HeapT Bool
+        aux :: (Ptr -> HeapT m Bool) -> Type -> HeapT Bool
         aux go (Ref _ ptr) = go ptr
         aux _  Bot         = return True
         aux _  One         = return True
         aux _  Skip        = return False
-        aux _  (Poly _ _)  = return True
         aux go (Seq t s)   = do
             tc <- aux go t
             sc <- aux go s
@@ -127,60 +130,63 @@ complete = fold aux True
         auxB :: (Ptr -> HeapT Bool) -> (Label, (Measure, Type)) -> HeapT Bool
         auxB go (_, (_, t)) = aux go t
 
-partial :: Type -> HeapT Bool
+partial :: Monad m => Type -> HeapT m Bool
 partial t = not <$> complete t
 
 type TypeDef = (TypeName, ([TypeName], Ptr))
+type TypeMap = Map (TypeName, [TypeName]) Ptr
+type TypeArgMap = Map TypeName Ptr
 
-make :: [SourceTypeDef] -> HeapT [TypeDef]
+make :: Monad m => [S.TypeDef] -> HeapT m [TypeDef]
 make = auxL
     where
-        auxL :: [SourceTypeDef] -> HeapT [TypeDef]
+        auxL :: [S.TypeDef] -> HeapT m [TypeDef]
         auxL tdefs = do
             ps <- mapM (const new) tdefs
             let ds = [ ((tname, targs), p) | ((tname, (targs, _)), p) <- zip tdefs ps ]
             let tmap = Map.fromList ds
             mapM (auxD tmap) ds
 
-        auxD :: TypeMap -> ((TypeName, ([TypeName], SourceType)), Ptr) -> HeapT TypeDef
+        auxD :: TypeMap -> ((TypeName, ([TypeName], S.Type)), Ptr) -> HeapT m TypeDef
         auxD tmap ((tname, (targs, s)), p) = do
-            t <- auxT tmap targs s
+            amap <- Map.fromList <$> zip targs <$> mapM (const new) targs
+            t <- auxT tmap amap s
             set p t
             return (tname, (targs, t))
 
-        auxT :: TypeMap -> [TypeName] -> SourceType -> HeapT Type
-        auxT tmap targs S.Bot       = return Bot
-        auxT tmap targs S.One       = return One
-        auxT tmap targs S.Skip      = return Skip
-        auxT tmap targs (S.Ref tname targs)
+        auxT :: TypeMap -> TypeArgMap -> S.Type -> HeapT m Type
+        auxT tmap amap S.Bot       = return Bot
+        auxT tmap amap S.One       = return One
+        auxT tmap amap S.Skip      = return Skip
+        auxT tmap amap (S.Ref tname targs)
             | Just p <- Map.lookup (tname, targs) tmap = return $ Ref False p
             | otherwise = error "unknown type"
-        auxT tmap targs (S.Poly d tname)
-            | tname `elem` targs = return $ Poly d tname
-            | otherwise = error "unknown type"
-        auxT (S.Seq t s) = do
-            t' <- auxT tmap targs t
-            s' <- auxT tmap targs s
+        auxT tmap amap (S.Poly d tname)
+            | Just p <- Map.lookup tname amap = return $ Ref d p
+            | otherwise = error "unknown type argument"
+        auxT tmap amap (S.Seq t s) = do
+            t' <- auxT tmap amap t
+            s' <- auxT tmap amap s
             return $ Seq t' s'
-        auxT tmap targs (S.Mul t s) = do
-            t' <- auxT tmap targs t
-            s' <- auxT tmap targs s
+        auxT tmap amap (S.Mul t s) = do
+            t' <- auxT tmap amap t
+            s' <- auxT tmap amap s
             return $ Mul t' s'
-        auxT tmap targs (S.Par t s) = do
-            t' <- auxT tmap targs t
-            s' <- auxT tmap targs s
+        auxT tmap amap (S.Par t s) = do
+            t' <- auxT tmap amap t
+            s' <- auxT tmap amap s
             return $ Par t' s'
-        auxT tmap targs (S.With bs) = do
-            bs' <- mapM (auxB tmap targs) bs
+        auxT tmap amap (S.With bs) = do
+            bs' <- mapM (auxB tmap amap) bs
             return $ With bs'
-        auxT tmap targs (S.Plus bs) = do
-            bs' <- mapM (auxB tmap targs) bs
+        auxT tmap amap (S.Plus bs) = do
+            bs' <- mapM (auxB tmap amap) bs
             return $ Plus bs'
-        auxT tmap targs (S.Dual t) = dual <$> auxT tmap targs t
+        auxT tmap amap (S.Dual t) = dual <$> auxT tmap amap t
 
-        auxB tmap targs (l, s) = do
+        auxB tmap amap (l, s) = do
             m <- newMeasure
-            t <- auxT tmap targs s
+            t <- auxT tmap amap s
             return (l, (m, t))
 
 -- typeMap :: (Measure -> Measure) -> (Node -> Node) -> Type -> Type
