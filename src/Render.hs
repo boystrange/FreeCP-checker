@@ -35,7 +35,7 @@ where
 
 import Atoms
 import Measure
-import Type
+import SourceType
 import Process
 import Prelude hiding ((<>))
 import Prettyprinter
@@ -133,50 +133,47 @@ prettyLabel = identifier . show
 
 -- TYPE VARIABLES
 
-instance Show TVar where
-  show (TVar n) | major == 0 = ['_', letters!!minor]
-                | otherwise  = '_' : letters!!minor : sub major
-    where
-      letters = ['α'..'ε']
-      max = length letters
-      major = n `div` max
-      minor = n `mod` max
+-- instance Show TVar where
+--   show (TVar n) | major == 0 = ['_', letters!!minor]
+--                 | otherwise  = '_' : letters!!minor : sub major
+--     where
+--       letters = ['α'..'ε']
+--       max = length letters
+--       major = n `div` max
+--       minor = n `mod` max
 
 -- TYPES
 
-prettyType :: (m -> Document) -> Type m -> Document
-prettyType prettyMeasure = annotate (PT.colorDull PT.Cyan) . aux
+prettyType :: Type -> Document
+prettyType = annotate (PT.colorDull PT.Cyan) . aux
   where
     aux One  = keyword "1"
     aux Bot  = keyword "⊥"
     aux Skip = keyword "skip"
     aux (Seq t s) = parens (aux t <> operator ";" <+> aux s)
     aux (Poly d tname) = identifier (show tname) <> (if d then operator "^" else emptyDoc)
-    aux (Var tname) = identifier (show tname)
-    aux (Rec tname t) = keyword "rec" <+> identifier (show tname) <> Render.dot <> aux t
+    aux (Ref tname targs) = identifier (show tname)
     aux (Par t s) = parens (aux t <+> operator "⅋" <+> aux s)
     aux (Mul t s) = parens (aux t <+> operator "⊗" <+> aux s)
     aux (Plus bs) = operator "⊕" <> embrace lbrace rbrace comma (map auxB bs)
     aux (With bs) = operator "&" <> embrace lbrace rbrace comma (map auxB bs)
 
-    auxB (tag, (m, t)) = constant (show tag) <> brackets (prettyMeasure m) <+> colon <+> aux t
+    auxB (tag, t) = constant (show tag) <+> colon <+> aux t
 
-prettyContext :: (m -> Document) -> Map ChannelName (Type m)  -> Document
-prettyContext prettyMeasure ctx = embrace lbrace rbrace comma (map prettyBind (Map.toList ctx))
+prettyContext :: Map ChannelName Type  -> Document
+prettyContext ctx = embrace lbrace rbrace comma (map prettyBind (Map.toList ctx))
   where
-    prettyBind (x, t) = identifier (show x) <+> operator ":" <+> prettyType prettyMeasure t
+    prettyBind (x, t) = identifier (show x) <+> operator ":" <+> prettyType t
 
-instance Show m => Show (Type m) where
-  show = PR.renderString . layoutPretty defaultLayoutOptions . prettyType unprettyMeasure
-    where
-      unprettyMeasure = const (pretty "…")
+instance Show Type where
+  show = PR.renderString . layoutPretty defaultLayoutOptions . prettyType
 
 -- |Print a type.
-printType :: TypeM -> IO ()
-printType = PT.putDoc . prettyType prettyMeasure
+printType :: Type -> IO ()
+printType = PT.putDoc . prettyType
 
-printContext :: Map ChannelName TypeM -> IO ()
-printContext = PT.putDoc . prettyContext prettyMeasure
+printContext :: Map ChannelName Type -> IO ()
+printContext = PT.putDoc . prettyContext
 
 -- PROCESSES
 
@@ -191,7 +188,7 @@ prettyProcess = go
     go (Join x y p) = identifier (show x) <> parens (identifier (show y)) <> Render.dot <> go p
     go (Select x tag p) = identifier (show x) <> operator "◃" <> identifier (show tag) <> Render.dot <> go p
     go (Case x bs) = identifier (show x) <> operator "▹" <> embrace lbrace rbrace comma (map goCase bs)
-    go (Cut x t p q) = keyword "new" <+> parens (identifier (show x) <+> colon <+> prettyType prettyMeasure t) <> encloseSep lparen rparen (space <> bar <> space) [go p, go q]
+    go (Cut x t p q) = keyword "new" <+> parens (identifier (show x) <+> colon <+> prettyType t) <> encloseSep lparen rparen (space <> bar <> space) [go p, go q]
 
     goCase (tag, p) = identifier (show tag) <+> colon <+> go p
 
@@ -240,7 +237,7 @@ printProcessDec (pname, μ, xts, p) = do
   PT.putDoc (identifier (show pname) <> brackets (prettyMeasure μ))
   printNewLine
   forM_ xts (\(x, t) -> do
-               PT.putDoc (space <+> identifier (show x) <+> colon <+> prettyType prettyMeasure t)
+               PT.putDoc (space <+> identifier (show x) <+> colon <+> prettyType t)
                printNewLine
             )
   PT.putDoc (operator "=" <+> prettyProcess p)

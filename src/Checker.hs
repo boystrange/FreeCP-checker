@@ -34,7 +34,7 @@ import Control.Monad.State.Lazy (StateT)
 import qualified Control.Monad.State.Lazy as State
 import Control.Exception (throw)
 import Data.Maybe ( fromJust )
-import qualified Render
+-- import qualified Render
 
 import Debug.Trace
 
@@ -45,9 +45,8 @@ import Type
 import Process
 import Exceptions
 
-type TypeContext = Map TypeName TypeM
 type ProcessContext = Map ProcessName (Measure, [TypeM])
-type Checker = StateT (ProcessContext, TVar, MVar, TypeContext, [MeasureConstraint]) IO
+type MeasureSource = StateT MVar Identity
 
 find :: TypeM -> Checker TypeM
 find t@(Poly d tname) = do
@@ -168,12 +167,6 @@ newTypeVar = do
   (penv, n, m, tmap, cs) <- State.get
   State.put (penv, succ n, m, tmap, cs)
   return (Poly False (Identifier Somewhere (show n)))
-
-newMeasureVar :: Checker MVar
-newMeasureVar = do
-  (penv, n, μ, tmap, cs) <- State.get
-  State.put (penv, n, succ μ, tmap, cs)
-  return μ
 
 annotateType :: TypeS -> Checker TypeM
 annotateType = aux

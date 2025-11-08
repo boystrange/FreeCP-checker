@@ -26,6 +26,7 @@ module Process where
 import Common
 import Atoms
 import Measure
+import qualified SourceType as S
 import Type
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -70,8 +71,8 @@ fn (Cut x _ p q) = Set.delete x (Set.union (fn p) (fn q))
 -- list of name declarations and an optional process body. When the
 -- body is 'Nothing' the process is declared and assumed to be well
 -- typed but is left unspecified.
-type ProcessS = Process TypeS
-type ProcessM = Process TypeM
+type ProcessS = Process S.Type
+type ProcessM = Process Type
 
-type ProcessDefS = (ProcessName, [(ChannelName, TypeS)], ProcessS)
-type ProcessDef = (ProcessName, Measure, [(ChannelName, TypeM)], ProcessM)
+type ProcessDefS = (ProcessName, [(ChannelName, S.Type)], ProcessS)
+type ProcessDef = (ProcessName, Measure, [(ChannelName, Type)], ProcessM)
