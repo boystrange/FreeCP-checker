@@ -72,7 +72,7 @@ fn (Cut x _ p q) = Set.delete x (Set.union (fn p) (fn q))
 -- body is 'Nothing' the process is declared and assumed to be well
 -- typed but is left unspecified.
 type ProcessS = Process S.Type
-type ProcessM = Process Type
+type ProcessM = Process (Type Measure)
 
 type ProcessDefS = (ProcessName, [(ChannelName, S.Type)], ProcessS)
-type ProcessDef = (ProcessName, Measure, [(ChannelName, Type)], ProcessM)
+type ProcessDef = (ProcessName, Measure, [(ChannelName, Type Measure)], ProcessM)

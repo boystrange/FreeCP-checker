@@ -58,7 +58,7 @@ data Type
   | Bot
   | Skip
   | Seq Type Type
-  | Poly Bool TypeName
+  | Poly TypeName
   | Ref TypeName [TypeName]
   | Par Type Type
   | Mul Type Type
