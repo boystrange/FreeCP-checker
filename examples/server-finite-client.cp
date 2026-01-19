@@ -1,6 +1,7 @@
 // server and finite client
 
-type A = &{ req : A; ⊕{ resp : skip }, stop : skip }
+type A = rec X.&{ req : X; ⊕{ resp : skip }, stop : skip }
+type B = rec X.⊕{ req : X; &{ resp : skip }, stop : skip }
 
 Server(x : A; α, y : α^ ⊗ 1) =
     x▹{
@@ -18,7 +19,7 @@ Server(x : A; α, y : α^ ⊗ 1) =
             y[]
     }
 
-Client(x : A^; 1) =
+Client(x : B; 1) =
     x◃req.
     x◃req.
     x◃req.

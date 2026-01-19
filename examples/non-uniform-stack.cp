@@ -1,35 +1,20 @@
 // non-uniform stack
 
-type A = &{ push : ?α; B; A, free : skip }
-type B = &{ push : ?α; B; B, pop  : !α^  }
+type B = rec X.&{ push : α ⅋ (X; X), pop : α^ ⊗ skip }
+type A = rec X.&{ push : α ⅋ (B; X), free : skip }
 
-None(x : A; γ, y : !γ^; 1) =
-    x▹{
-        push :
+None(x : A; γ, y : γ^ ⊗ 1) =
+    x▹{ push :
             x(u).
-            new (z : !(A; γ)^; 1)
-                Some(u, x, z)
-            in
-                z(x).
-                z().
-                None(x, y)
-    ,   free :
-            y⟨x⟩.
-            y[]
-    }
+            new (z : (A; γ) ⅋ ⊥)
+                z(x).z().None(x, y)
+            in Some(u, x, z)
+       , free : y⟨x⟩.y[] }
 
-Some(v : α, x : B; γ, y : !γ^; 1) =
-    x▹{
-        push :
+Some(v : α, x : B; γ, y : γ^ ⊗ 1) =
+    x▹{ push :
             x(u).
-            new (z : !(B; γ)^; 1)
-                Some(u, x, z)
-            in
-                z(x).
-                z().
-                Some(v, x, y)
-    ,   pop :
-            x⟨v⟩.
-            y⟨x⟩.
-            y[]
-    }
+            new (z : (B; γ) ⅋ ⊥)
+                z(x).z().Some(v, x, y)
+            in Some(u, x, z)
+       , pop : x⟨v⟩.y⟨x⟩.y[] }

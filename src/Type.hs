@@ -64,9 +64,10 @@ data Type m
   | Rec TypeName (Type m)
   | Par (Type m) (Type m)
   | Mul (Type m) (Type m)
-  | With [(Label, (m, Type m))]
-  | Plus [(Label, (m, Type m))]
-  | Dual (Type m)  -- internal use only
+  | With [(Label, Type m)]
+  | Plus [(Label, Type m)]
+  | Put m -- internal use only
+  | Get m -- internal use only
   deriving (Eq, Ord)
 
 type TypeS = Type ()
@@ -84,8 +85,8 @@ instance TypeVariables (Type m) where
   tvars (Rec tname t)  = Set.delete (RecVar tname) (tvars t)
   tvars (Par t s)      = Set.union (tvars t) (tvars s)
   tvars (Mul t s)      = Set.union (tvars t) (tvars s)
-  tvars (With bs)      = Set.unions (map (tvars . snd . snd) bs)
-  tvars (Plus bs)      = Set.unions (map (tvars . snd . snd) bs)
+  tvars (With bs)      = Set.unions (map (tvars . snd) bs)
+  tvars (Plus bs)      = Set.unions (map (tvars . snd) bs)
   tvars _              = Set.empty
 
 tsubst :: TypeVariable -> Type m -> Type m -> Type m
@@ -95,8 +96,10 @@ tsubsts :: TMap m -> Type m -> Type m
 tsubsts tmap (Seq t s)      = Seq (tsubsts tmap t) (tsubsts tmap s)
 tsubsts tmap (Par t s)      = Par (tsubsts tmap t) (tsubsts tmap s)
 tsubsts tmap (Mul t s)      = Mul (tsubsts tmap t) (tsubsts tmap s)
-tsubsts tmap (Plus bs)      = Plus (mapSnd (fmap (tsubsts tmap)) bs)
-tsubsts tmap (With bs)      = With (mapSnd (fmap (tsubsts tmap)) bs)
+tsubsts tmap (Plus bs)      = Plus (mapSnd (tsubsts tmap) bs)
+tsubsts tmap (With bs)      = With (mapSnd (tsubsts tmap) bs)
+tsubsts tmap (Put m)        = Put m
+tsubsts tmap (Get m)        = Get m
 tsubsts tmap (Poly d sname) | Just t <- Map.lookup (PolyVar sname) tmap = if d then dual t else t
 tsubsts tmap (Var sname)    | Just t <- Map.lookup (RecVar sname) tmap = t
 tsubsts tmap (Rec sname t)  = Rec sname (tsubsts (Map.delete (RecVar sname) tmap) t)
@@ -105,10 +108,10 @@ tsubsts tmap s              = s
 instance TypeVariables a => TypeVariables [a] where
   tvars = Set.unions . map tvars
 
--- unfold :: Type m -> Type m
--- unfold (Seq t s) = unfold (unfold t |> s)
--- unfold t@(Rec tname s) = unfold (tsubst (RecVar tname) t s)
--- unfold t = t
+unfold :: Type m -> Type m
+unfold (Seq t s) = unfold (unfold t |> s)
+unfold t@(Rec tname s) = unfold (tsubst (RecVar tname) t s)
+unfold t = t
 
 dual :: Type m -> Type m
 dual One            = Bot
@@ -120,25 +123,44 @@ dual (Var tname)    = Var tname
 dual (Rec tname t)  = Rec tname (dual t)
 dual (Par t s)      = Mul (dual t) (dual s)
 dual (Mul t s)      = Par (dual t) (dual s)
-dual (With bs)      = Plus (mapSnd (fmap dual) bs)
-dual (Plus bs)      = With (mapSnd (fmap dual) bs)
+dual (With bs)      = Plus (mapSnd (dual) bs)
+dual (Plus bs)      = With (mapSnd (dual) bs)
+dual (Put m)        = Get m
+dual (Get m)        = Put m
+
+-- if s is a (possibly folded) normal form then t |> s is a (possibly folded) normal form
+(|>) :: Type m -> Type m -> Type m
+(|>) One            _ = One
+(|>) Bot            _ = Bot
+(|>) Skip           k = k
+(|>) (Seq t s)      k = t |> (s |> k)
+(|>) (Poly d tname) k = Poly d tname >>> k -- CHECK THIS, MAY OR MAY NOT REQUIRE >>> k
+(|>) (Var tname)    k = Var tname >>> k
+(|>) (Rec tname t)  k = Rec tname t >>> k
+(|>) (Par t s)      k = Par t (s |> k)
+(|>) (Mul t s)      k = Mul t (s |> k)
+(|>) (With bs)      k = With (mapSnd (|> k) bs)
+(|>) (Plus bs)      k = Plus (mapSnd (|> k) bs)
+(|>) (Put m)        k = Put m >>> k
+(|>) (Get m)        k = Get m >>> k
+
+(>>>) :: Type m -> Type m -> Type m
+(>>>) t Skip = t
+(>>>) t s    = Seq t s
 
 normalize :: Type m -> Type m
-normalize = go True []
+normalize t = t |> Skip
+
+expose :: Type m -> Type m
+expose t = aux (normalize t)
   where
-    go :: Bool -> [Type m] -> Type m -> Type m
-    go _    _        One             = One
-    go _    _        Bot             = Bot
-    go _    []       Skip            = Skip
-    go unf  (t : ts) Skip            = go unf ts t
-    go unf  ts       (Seq t s)       = go unf (s : ts) t
-    go _    _        (Poly d tname)  = Poly d tname
-    go _    ts       (Mul t s)       = Mul t (go False ts s)
-    go _    ts       (Par t s)       = Par t (go False ts s)
-    go _    ts       (Plus bs)       = Plus (mapSnd (fmap $ go False ts) bs)
-    go _    ts       (With bs)       = With (mapSnd (fmap $ go False ts) bs)
-    go True ts       t@(Rec tname s) = go True ts (tsubst (RecVar tname) t s)
-    go _    ts       t@(Rec _ _)     = Seq t (go False ts Skip)
+    aux t@(Rec tname s) = aux (tsubst (RecVar tname) t s)
+    aux (Seq t s)       = aux t |> s
+    aux t               = t
+
+-- expose (Seq t s) = expose t |> expose s
+-- expose t@(Rec tname s) = expose (tsubst (RecVar tname) t s)
+-- expose t = t |> Skip
 
 instance MeasureVariables t => MeasureVariables (Type t) where
   mvars One            = Set.empty
@@ -150,6 +172,7 @@ instance MeasureVariables t => MeasureVariables (Type t) where
   mvars (Rec tname t)  = mvars t
   mvars (Par t s)      = Set.union (mvars t) (mvars s)
   mvars (Mul t s)      = Set.union (mvars t) (mvars s)
-  mvars (With bs)      = Set.unions [ Set.union (mvars m) (mvars t) | (_, (m, t)) <- bs ]
-  mvars (Plus bs)      = Set.unions [ Set.union (mvars m) (mvars t) | (_, (m, t)) <- bs ]
-  
+  mvars (With bs)      = Set.unions (map (mvars . snd) bs)
+  mvars (Plus bs)      = Set.unions (map (mvars . snd) bs)
+  mvars (Put m)        = mvars m
+  mvars (Get m)        = mvars m

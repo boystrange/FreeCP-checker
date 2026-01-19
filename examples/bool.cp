@@ -1,21 +1,22 @@
-type Bool = ⊕{ tt : 1, ff : 1 }
+type Bool  = ⊕{ tt : 1, ff : 1 }
+type BoolC = &{ tt : ⊥, ff : ⊥ }
 
-Not(x : Bool^, y : Bool) =
+Not(x : BoolC, y : Bool) =
     x▹{
         tt : x().y◃ff.y[],
         ff : x().y◃tt.y[]
     }
 
-Copy(x : Bool^, y : Bool) =
+Copy(x : BoolC, y : Bool) =
     new (z : Bool) Not(x, z) in Not(z, y)
 
-Drop(x : Bool^, y : 1) =
+Drop(x : BoolC, y : 1) =
     x▹{
         tt : x().y[],
         ff : x().y[]
     }
 
-And(x : Bool^, y : Bool^, z : Bool) =
+And(x : BoolC, y : BoolC, z : Bool) =
     x▹{
         tt : x(). y ↔ z,
         ff : x().

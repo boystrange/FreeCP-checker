@@ -90,6 +90,7 @@ solve μs cs =
         auxM (MCon k) = conZ (fromIntegral k)
         auxM (MRef i) = z1 i
         auxM (MAdd m n) = auxM m .+. auxM n
+        auxM (MSub m n) = auxM m .-. auxM n
 
     constraint :: MyConstraint
     constraint = foldl (:&&) CTrue constraints

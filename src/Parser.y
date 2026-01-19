@@ -45,6 +45,7 @@ import Control.Exception
   TYPE      { Token _ TokenType }
   SKIP      { Token _ TokenSkip }
   NEW       { Token _ TokenNew }
+  REC       { Token _ TokenRec }
   IN        { Token _ TokenIn }
   CID       { $$@(Token _ (TokenCID _)) }
   LID       { $$@(Token _ (TokenLID _)) }
@@ -80,7 +81,7 @@ import Control.Exception
 %nonassoc '='
 %left '+'
 %right ';'
-%left '*' '|'
+%right '*' '|'
 %nonassoc '++' '--'
 %nonassoc '?' '!'
 %nonassoc '^'
@@ -186,9 +187,9 @@ Type
            else error $ (show $1) ++ " is not a type" }
   | '⊥'  { Bot }
   | TypeName { Var $1 }
-  | TypeName '=' Type { Rec $1 $3 }
+  | REC TypeName '.' Type { Rec $2 $4 }
   | PolyName { Poly False $1 }
-  | Type '^' { Dual $1 }
+  | PolyName '^' { Poly True $1 }
   | '(' Type ')' { $2 }
   | Type '*' Type { Mul $1 $3 }
   | Type '|' Type { Par $1 $3 }
@@ -215,7 +216,7 @@ BranchNeList
   | Branch ',' BranchNeList { $1 : $3 }
 
 Branch
-  : Label ':' Type { ($1, ((), $3)) }
+  : Label ':' Type { ($1, $3) }
 
 {
 -- external :: Type -> Type -> Type

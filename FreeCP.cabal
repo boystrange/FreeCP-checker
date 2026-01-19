@@ -25,6 +25,7 @@ executable freecp
                      Resolver,
                      Parser,
                      Lexer,
+                     Instrumenter,
                      Checker,
                      Solver,
                      Render,

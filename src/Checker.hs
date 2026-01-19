@@ -121,29 +121,21 @@ unify = mapM_ aux
           auxT t1 t2
           auxT s1 s2
         auxV (With bs1) (With bs2) = do
-          let map1 = Map.fromList bs1
-          let map2 = Map.fromList bs2
-          sameTags (Map.keysSet map1) (Map.keysSet map2)
-          forM_ (Map.elems (zipMap map1 map2)) $ \((m1, t1), (m2, t2)) -> do
-            addMeasureConstraintEq m1 m2
-            auxT t1 t2
+          let m1 = Map.fromList bs1
+          let m2 = Map.fromList bs2
+          tle (Map.keysSet m2) (Map.keysSet m1)
+          forM_ (Map.elems (zipMap m1 m2)) (uncurry auxT)
         auxV (Plus bs1) (Plus bs2) = do
-          let map1 = Map.fromList bs1
-          let map2 = Map.fromList bs2
-          sameTags (Map.keysSet map1) (Map.keysSet map2)
-          forM_ (Map.elems (zipMap map1 map2)) $ \((m1, t1), (m2, t2)) -> do
-            addMeasureConstraintEq m1 m2
-            auxT t1 t2
-        -- auxV (Put m t) (Put n s) = do
-        --   auxT t s
-        --   addMeasureConstraintEq n m
-        -- auxV (Get m t) (Get n s) = do
-        --   auxT t s
-        --   addMeasureConstraintEq m n
+          let m1 = Map.fromList bs1
+          let m2 = Map.fromList bs2
+          tle (Map.keysSet m1) (Map.keysSet m2)
+          forM_ (Map.elems (zipMap m1 m2)) (uncurry auxT)
+        auxV (Put m) (Put n) = addMeasureConstraintEq n m
+        auxV (Get m) (Get n) = addMeasureConstraintEq m n
         -- type mismatch
         auxV t s = throw $ ErrorTypeMismatch name (show t) s
 
-        sameTags tags1 tags2 =
+        tle tags1 tags2 =
           unless (tags1 == tags2) $
             throw $ ErrorLabelMismatch name (Set.elems tags1) (Set.elems tags2)
 
@@ -204,19 +196,12 @@ annotateType = aux
     aux (With bs) = do
       bs' <- mapM auxB bs
       return $ With bs'
-    -- aux (Get m t) = do
-    --   m' <- auxM m
-    --   t' <- aux t
-    --   return $ Get m' t'
-    -- aux (Put m t) = do
-    --   m' <- auxM m
-    --   t' <- aux t
-    --   return $ Put m' t'
+    aux (Get m) = Get <$> auxM m
+    aux (Put m) = Put <$> auxM m
 
-    auxB (tag, (m, t)) = do
-      m' <- auxM m
+    auxB (tag, t) = do
       t' <- aux t
-      return (tag, (m', t'))
+      return (tag, t')
 
     auxM () = MRef <$> newMeasureVar
 
@@ -243,12 +228,12 @@ annotateProcess = go
     go (Case x bs) = do
       bs <- mapM goB bs
       return $ Case x bs
-    -- go (PutGas x p) = do
-    --   p <- go p
-    --   return $ PutGas x p
-    -- go (GetGas x p) = do
-    --   p <- go p
-    --   return $ GetGas x p
+    go (PutGas x p) = do
+      p <- go p
+      return $ PutGas x p
+    go (GetGas x p) = do
+      p <- go p
+      return $ GetGas x p
     go (Cut x t p q) = do
       t <- annotateType t
       p <- go p
@@ -387,7 +372,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       -- Remove the association for x from the context.
       (ctx, t) <- remove ctx x
       -- Make sure that the type of x is ?end
-      checkTypeEq x Type.Bot (Type.normalize t)
+      checkTypeEq x Type.Bot (Type.expose t)
       -- Type check the continuation.
       (p', μ) <- auxP ctx p
       return (Wait x p', μ)
@@ -398,7 +383,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       -- Make sure that the remaining context is empty.
       checkEmpty ctx
       -- Make sure that the type of x is !end
-      checkTypeEq x Type.One (Type.normalize t)
+      checkTypeEq x Type.One (Type.expose t)
       μ <- MRef <$> newMeasureVar
       return (Close x, msucc μ)
     -- Rule [#]
@@ -408,7 +393,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       -- Remove the association for x from the context.
       (ctx, t) <- remove ctx x
       -- Check the shape of the type of x.
-      case Type.normalize t of
+      case Type.expose t of
         -- If it is the input of a channel, insert the association
         -- for y in the context along with the updated type of x and
         -- type check the continuation.
@@ -425,7 +410,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       (ctx, t) <- remove ctx x
       let (ctxp, ctxq) = partitionContext ctx p q
       -- Check the shape of the type associated with x.
-      case Type.normalize t of
+      case Type.expose t of
         -- If it is the output of a channel...
         Type.Mul s t' -> do
           ctxp <- insert ctxp y s
@@ -439,13 +424,13 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
     -- Rule [⊕]
     auxP ctx (Select x tag p) = do
       (ctx, t) <- remove ctx x
-      case Type.normalize t of
+      case Type.expose t of
         s@(Type.Plus bs) -> do
           case lookup tag bs of
-            Just (νk, sk) -> do
+            Just sk -> do
               ctx <- insert ctx x sk
               (p', μ) <- auxP ctx p
-              return (Select x tag p', msucc (madd μ νk))
+              return (Select x tag p', msucc μ)
             Nothing -> throw $ ErrorLabelMismatch x (map fst bs) [tag]
         _ -> throw $ ErrorTypeMismatch x "⊕" t
     -- Rule [&]
@@ -454,7 +439,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       -- Remove the association for x from the context.
       (ctx, t) <- remove ctx x
       -- Check the shape of the type associated with x.
-      case Type.normalize t of
+      case Type.expose t of
         -- If it is a "with"...
         Type.With bs -> do
           let tmap = Map.fromList bs
@@ -468,14 +453,34 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
           unless (tlabels == plabels) $ throw $ ErrorLabelMismatch x tlabels plabels
           -- Type check each branch after updating the context.
           tps <- forM (Map.toList (zipMap tmap pmap)) $
-            \(tag, ((νi, si), pi)) -> do
+            \(tag, (si, pi)) -> do
               ctx <- insert ctx x si
               (pi', μi) <- auxP ctx pi
-              addMeasureConstraintLe μi (madd μ νi)
+              addMeasureConstraintLe μi μ
               return (tag, pi')
           return (Case x tps, μ)
         -- In all the other cases the type is just the wrong one
         _ -> throw $ ErrorTypeMismatch x "&" t
+    -- Rule [put]
+    auxP ctx (PutGas x p) = do
+      (ctx, t) <- remove ctx x
+      case Type.expose t of
+        Type.Seq (Type.Put ν) s -> do
+          ctx <- insert ctx x s
+          (p', μ) <- auxP ctx p
+          return (PutGas x p', madd μ ν)
+        _ -> throw $ ErrorTypeMismatch x "put" t
+    -- Rule [get]
+    auxP ctx (GetGas x p) = do
+      (ctx, t) <- remove ctx x
+      case Type.expose t of
+        -- _ -> throw $ ErrorTypeMismatch x "debug" t
+        Type.Seq (Type.Get ν) s -> do
+          ctx <- insert ctx x s
+          (p', μ) <- auxP ctx p
+          addMeasureConstraintLe ν μ
+          return (GetGas x p', MSub μ ν)
+        u -> throw $ ErrorTypeMismatch x "get" u
     -- Rule [cut]
     auxP ctx (Cut x t p q) = do
       -- If x already occurs in the context we throw an exception, because it

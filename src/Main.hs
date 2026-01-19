@@ -23,6 +23,7 @@
 -- |This module parses the command-line arguments and invokes the type checker.
 module Main (main) where
 
+import qualified Instrumenter
 import qualified Resolver
 import qualified Checker
 import qualified Solver
@@ -63,13 +64,14 @@ main = do
         catch (check file args pdefs') (handler args)
   where
     check :: FilePath -> [Flag] -> [ProcessDefS] -> IO ()
-    check file args pdefs = do
+    check file args pdefs0 = do
       let verbose = Verbose `elem` args
       let logging = Logging `elem` args
       when logging
         (do putStr $ takeFileName file ++ " ... "
             hFlush stdout)
       start <- getCurrentTime
+      let pdefs = Instrumenter.instrument pdefs0
       (tmap, cs, pdefs') <- Checker.checkTypes pdefs
       forM_ pdefs' printProcessDec
       when verbose $ do

@@ -105,6 +105,7 @@ setFilePath = alexSetUserState . AlexUserState
 
 keywords :: [(String, TokenClass)]
 keywords = [("type",      TokenType),
+            ("rec",       TokenRec),
             ("in",        TokenIn),
             ("new",       TokenNew),
             ("skip",      TokenSkip)]
