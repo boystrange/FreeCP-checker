@@ -158,9 +158,12 @@ expose t = aux (normalize t)
     aux (Seq t s)       = aux t |> s
     aux t               = t
 
--- expose (Seq t s) = expose t |> expose s
--- expose t@(Rec tname s) = expose (tsubst (RecVar tname) t s)
--- expose t = t |> Skip
+wellFormed :: Type m -> Bool
+wellFormed t =
+  case kind t of
+    Just Guarded -> True
+    Just Nullable -> True
+    _ -> False
 
 data Kind = Nullable | Unguarded TypeName | Guarded
   deriving (Eq, Ord)

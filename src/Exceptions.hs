@@ -41,7 +41,7 @@ data MyException
   | ErrorCastUnbounded ProcessName ChannelName
   | ErrorSessionUnbounded ProcessName ChannelName
   | ErrorTypeUnbounded ChannelName
-  | ErrorTypeNonContractive TypeName
+  | ErrorTypeNonContractive TypeM
   | ErrorTypeMismatch ChannelName String TypeM
   | ErrorArityMismatch ProcessName Int Int
   | ErrorLabelMismatch ChannelName [Label] [Label]
@@ -71,7 +71,7 @@ instance Show MyException where
   show (ErrorLinearity pnames) = "linearity violation: " ++ List.intercalate ", " (map showWithPos pnames)
   show (ErrorLabelMismatch name elabels alabels) = "labels mismatch: " ++ showWithPos name ++ ": expected " ++ show elabels ++ ", actual " ++ show alabels
   show (ErrorTypeUnbounded name) = "unbounded type: " ++ showWithPos name
-  show (ErrorTypeNonContractive tname) = "non-contractive type: " ++ showWithPos tname
+  show (ErrorTypeNonContractive t) = "non-contractive type: " ++ show t
   show (ErrorRuntime msg) = "runtime error: " ++ msg
   show ErrorGeneric = "generic error"
   show (ErrorDebug msg) = "debug " ++ msg

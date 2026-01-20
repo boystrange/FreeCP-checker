@@ -72,6 +72,10 @@ addTypeConstraint tname t = do
   (pctxt, tv, mv, tmap, cs) <- State.get
   State.put (pctxt, tv, mv, Map.insert tname t tmap, cs)
 
+expose :: TypeM -> TypeM
+expose t | Type.wellFormed t = Type.expose t
+expose t = throw $ ErrorTypeNonContractive t
+
 unify :: [(ChannelName, TypeM, TypeM)] -> Checker ()
 unify = mapM_ aux
   where
@@ -80,11 +84,11 @@ unify = mapM_ aux
       where
         auxT :: TypeM -> TypeM -> Checker ()
         auxT t s = do
-          State.lift $ putStr "UNIFY "
-          State.lift $ Render.printType t
-          State.lift $ putStr "\nAND   "
-          State.lift $ Render.printType s
-          State.lift $ putStrLn "\n"
+          -- State.lift $ putStr "UNIFY "
+          -- State.lift $ Render.printType t
+          -- State.lift $ putStr "\nAND   "
+          -- State.lift $ Render.printType s
+          -- State.lift $ putStrLn "\n"
           tf <- find t
           sf <- find s
           auxV tf sf
@@ -372,7 +376,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       -- Remove the association for x from the context.
       (ctx, t) <- remove ctx x
       -- Make sure that the type of x is ?end
-      checkTypeEq x Type.Bot (Type.expose t)
+      checkTypeEq x Type.Bot (Checker.expose t)
       -- Type check the continuation.
       (p', μ) <- auxP ctx p
       return (Wait x p', μ)
@@ -383,7 +387,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       -- Make sure that the remaining context is empty.
       checkEmpty ctx
       -- Make sure that the type of x is !end
-      checkTypeEq x Type.One (Type.expose t)
+      checkTypeEq x Type.One (Checker.expose t)
       μ <- MRef <$> newMeasureVar
       return (Close x, msucc μ)
     -- Rule [#]
@@ -393,7 +397,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       -- Remove the association for x from the context.
       (ctx, t) <- remove ctx x
       -- Check the shape of the type of x.
-      case Type.expose t of
+      case Checker.expose t of
         -- If it is the input of a channel, insert the association
         -- for y in the context along with the updated type of x and
         -- type check the continuation.
@@ -410,7 +414,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       (ctx, t) <- remove ctx x
       let (ctxp, ctxq) = partitionContext ctx p q
       -- Check the shape of the type associated with x.
-      case Type.expose t of
+      case Checker.expose t of
         -- If it is the output of a channel...
         Type.Mul s t' -> do
           ctxp <- insert ctxp y s
@@ -424,7 +428,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
     -- Rule [⊕]
     auxP ctx (Select x tag p) = do
       (ctx, t) <- remove ctx x
-      case Type.expose t of
+      case Checker.expose t of
         s@(Type.Plus bs) -> do
           case lookup tag bs of
             Just sk -> do
@@ -439,7 +443,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       -- Remove the association for x from the context.
       (ctx, t) <- remove ctx x
       -- Check the shape of the type associated with x.
-      case Type.expose t of
+      case Checker.expose t of
         -- If it is a "with"...
         Type.With bs -> do
           let tmap = Map.fromList bs
@@ -448,8 +452,8 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
           let tlabels = Map.keys tmap
           -- Retrieve the set of labels from the process
           let plabels = Map.keys pmap
-          -- If the two sets of labels differ, there is mismatch between type
-          -- and process.
+          -- If the two sets of labels differ, there is mismatch
+          -- between type and process.
           unless (tlabels == plabels) $ throw $ ErrorLabelMismatch x tlabels plabels
           -- Type check each branch after updating the context.
           tps <- forM (Map.toList (zipMap tmap pmap)) $
@@ -464,17 +468,16 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
     -- Rule [put]
     auxP ctx (PutGas x p) = do
       (ctx, t) <- remove ctx x
-      case Type.expose t of
+      case Checker.expose t of
         Type.Seq (Type.Put ν) s -> do
           ctx <- insert ctx x s
           (p', μ) <- auxP ctx p
-          return (PutGas x p', madd μ ν)
+          return (PutGas x p', msucc (madd μ ν))
         _ -> throw $ ErrorTypeMismatch x "put" t
     -- Rule [get]
     auxP ctx (GetGas x p) = do
       (ctx, t) <- remove ctx x
-      case Type.expose t of
-        -- _ -> throw $ ErrorTypeMismatch x "debug" t
+      case Checker.expose t of
         Type.Seq (Type.Get ν) s -> do
           ctx <- insert ctx x s
           (p', μ) <- auxP ctx p
@@ -483,8 +486,8 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
         u -> throw $ ErrorTypeMismatch x "get" u
     -- Rule [cut]
     auxP ctx (Cut x t p q) = do
-      -- If x already occurs in the context we throw an exception, because it
-      -- would shadow a linear resource.
+      -- If x already occurs in the context we throw an exception,
+      -- because it would shadow a linear resource.
       when (x `Map.member` ctx) $ throw $ ErrorLinearity [x]
       let (ctxp, ctxq) = partitionContext ctx p q
       ctxp <- insert ctxp x t
