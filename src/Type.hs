@@ -162,6 +162,48 @@ expose t = aux (normalize t)
 -- expose t@(Rec tname s) = expose (tsubst (RecVar tname) t s)
 -- expose t = t |> Skip
 
+data Kind = Nullable | Unguarded TypeName | Guarded
+  deriving (Eq, Ord)
+
+kind :: Type m -> Maybe Kind
+kind = go
+  where
+    go :: Type m -> Maybe Kind
+    go One = return Guarded
+    go Bot = return Guarded
+    go Skip = return Nullable
+    go (Seq t s) = do
+      k <- go t
+      case k of
+        Unguarded tname -> return (Unguarded tname)
+        Nullable -> go s
+        Guarded -> do
+          _ <- go s
+          return Guarded
+    go (Poly _ _) = return Nullable
+    go (Var tname) = return (Unguarded tname)
+    go (Rec tname t) = do
+      k <- go t
+      if k == Unguarded tname
+        then Nothing
+        else return k
+    go (Par t s) = do
+      _ <- go t
+      _ <- go s
+      return Guarded
+    go (Mul t s) = do
+      _ <- go t
+      _ <- go s
+      return Guarded
+    go (With bs) = do
+      forM_ bs (go . snd)
+      return Guarded
+    go (Plus bs) = do
+      forM_ bs (go . snd)
+      return Guarded
+    go (Get _) = return Guarded
+    go (Put _) = return Guarded
+
 instance MeasureVariables t => MeasureVariables (Type t) where
   mvars One            = Set.empty
   mvars Bot            = Set.empty
