@@ -186,7 +186,7 @@ printContext = PT.putDoc . prettyContext prettyMeasure
 prettyProcess :: ProcessM -> Document
 prettyProcess = go
   where
-    go (Call pname xs) = identifier (show pname) <> encloseSep lparen rparen comma (map (identifier . show) xs)
+    go (Call pname xs) = identifier (show pname) <> encloseSep langle rangle comma (map (identifier . show) xs)
     go (Link x y) = identifier (show x) <+> operator "↔" <+> identifier (show y)
     go (Close x) = identifier (show x) <> brackets emptyDoc
     go (Wait x p) = identifier (show x) <> parens emptyDoc <> Render.dot <> go p
@@ -194,9 +194,10 @@ prettyProcess = go
     go (Join x y p) = identifier (show x) <> parens (identifier (show y)) <> Render.dot <> go p
     go (Select x tag p) = identifier (show x) <> operator "◃" <> identifier (show tag) <> Render.dot <> go p
     go (Case x bs) = identifier (show x) <> operator "▹" <> embrace lbrace rbrace comma (map goCase bs)
-    go (Cut x t p q) = keyword "new" <+> parens (identifier (show x) <+> colon <+> prettyType prettyMeasure t) <> encloseSep lparen rparen (space <> bar <> space) [go p, go q]
-    go (PutGas x p) = keyword "put" <+> identifier (show x) <> Render.dot <> go p
-    go (GetGas x p) = keyword "get" <+> identifier (show x) <> Render.dot <> go p
+    go (Cut x t p q) = parens (identifier (show x) <+> colon <+> prettyType prettyMeasure t) <>
+                       encloseSep lparen rparen (space <> bar <> space) [go p, go q]
+    go (PutGas x p) = identifier (show x) <+> keyword "put" <> Render.dot <> go p
+    go (GetGas x p) = identifier (show x) <+> keyword "get" <> Render.dot <> go p
 
     goCase (tag, p) = identifier (show tag) <+> colon <+> go p
 
