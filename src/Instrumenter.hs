@@ -50,7 +50,7 @@ instrument = map goD
     goE (Dual t) = Dual (goT t)
 
     goT :: TypeS -> TypeS
-    goT (Var tname) = Var tname
+    goT (Inv tname) = Inv tname
     goT (Rec tname t) = Rec tname (goT t)
     goT (Seq t s) = Seq (goT t) (goT s)
     goT (Par t s) = Par (goT t) (goT s)

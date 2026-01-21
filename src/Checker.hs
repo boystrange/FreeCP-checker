@@ -50,7 +50,7 @@ type ProcessContext = Map ProcessName (Measure, [TypeM])
 type Checker = StateT (ProcessContext, TVar, MVar, TypeContext, [MeasureConstraint]) IO
 
 find :: TypeM -> Checker TypeM
-find t@(Poly d tname) = do
+find t@(Var d tname) = do
   (_, _, _, tmap, _) <- State.get
   case Map.lookup tname tmap of
     Nothing -> return t
@@ -94,19 +94,19 @@ unify = mapM_ aux
           auxV tf sf
 
         -- unification for polymorphic variables
-        auxV (Poly False tname) (Poly False sname) | tname == sname = return ()
-        auxV t@(Poly False tname) s | Set.member (PolyVar tname) (tvars s) = throw $ ErrorTypeMismatch name (show t) s
-        auxV t@(Poly _ tname) s@(Poly _ sname) | tname > sname = auxT s t
-        auxV (Poly False tname) s | Set.null (rvars s) = addTypeConstraint tname s
+        auxV (Var False tname) (Var False sname) | tname == sname = return ()
+        auxV t@(Var False tname) s | Set.member (PolyVar tname) (tvars s) = throw $ ErrorTypeMismatch name (show t) s
+        auxV t@(Var _ tname) s@(Var _ sname) | tname > sname = auxT s t
+        auxV (Var False tname) s | Set.null (rvars s) = addTypeConstraint tname s
                                   | otherwise = throw $ ErrorNotImplemented "unification with free recursion variables"
-        auxV (Poly True tname) s = auxT (Type.dual s) (Poly False tname)
-        auxV t s@(Poly _ _) = auxT s t
+        auxV (Var True tname) s = auxT (Type.dual s) (Var False tname)
+        auxV t s@(Var _ _) = auxT s t
 
         -- TODO: to implement the occur check correctly we should look at the
         -- type expanded with all the unifications
 
         -- unification for equi-recursive types
-        auxV (Var tname) (Var sname) | tname == sname = return ()
+        auxV (Inv tname) (Inv sname) | tname == sname = return ()
         auxV (Rec tname t) (Rec sname s) | tname == sname = auxT t s
 
         -- unification for sequential composition
@@ -163,7 +163,7 @@ newTypeVar :: Checker TypeM
 newTypeVar = do
   (penv, n, m, tmap, cs) <- State.get
   State.put (penv, succ n, m, tmap, cs)
-  return (Poly False (Identifier Somewhere (show n)))
+  return (Var False (Identifier Somewhere (show n)))
 
 newMeasureVar :: Checker MVar
 newMeasureVar = do
@@ -174,8 +174,8 @@ newMeasureVar = do
 annotateType :: TypeS -> Checker TypeM
 annotateType = aux
   where
-    aux (Poly tname t) = return $ Poly tname t
-    aux (Var tname) = return $ Var tname
+    aux (Var tname t) = return $ Var tname t
+    aux (Inv tname) = return $ Inv tname
     aux One = return One
     aux Bot = return Bot
     aux Skip = return Skip

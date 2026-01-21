@@ -59,8 +59,8 @@ data Type m
   | Bot
   | Skip
   | Seq (Type m) (Type m)
-  | Poly Bool TypeName
-  | Var TypeName
+  | Var Bool TypeName
+  | Inv TypeName
   | Rec TypeName (Type m)
   | Par (Type m) (Type m)
   | Mul (Type m) (Type m)
@@ -84,8 +84,8 @@ type TypeDef = (TypeName, TypeS)
 
 instance TypeVariables (Type m) where
   tvars (Seq t s)      = Set.union (tvars t) (tvars s)
-  tvars (Poly _ tname) = Set.singleton (PolyVar tname)
-  tvars (Var tname)    = Set.singleton (RecVar tname)
+  tvars (Var _ tname) = Set.singleton (PolyVar tname)
+  tvars (Inv tname)    = Set.singleton (RecVar tname)
   tvars (Rec tname t)  = Set.delete (RecVar tname) (tvars t)
   tvars (Par t s)      = Set.union (tvars t) (tvars s)
   tvars (Mul t s)      = Set.union (tvars t) (tvars s)
@@ -104,8 +104,8 @@ tsubsts tmap (Plus bs)      = Plus (mapSnd (tsubsts tmap) bs)
 tsubsts tmap (With bs)      = With (mapSnd (tsubsts tmap) bs)
 tsubsts tmap (Put m)        = Put m
 tsubsts tmap (Get m)        = Get m
-tsubsts tmap (Poly d sname) | Just t <- Map.lookup (PolyVar sname) tmap = if d then dual t else t
-tsubsts tmap (Var sname)    | Just t <- Map.lookup (RecVar sname) tmap = t
+tsubsts tmap (Var d sname) | Just t <- Map.lookup (PolyVar sname) tmap = if d then dual t else t
+tsubsts tmap (Inv sname)    | Just t <- Map.lookup (RecVar sname) tmap = t
 tsubsts tmap (Rec sname t)  = Rec sname (tsubsts (Map.delete (RecVar sname) tmap) t)
 tsubsts tmap s              = s
 
@@ -118,35 +118,35 @@ unfold t@(Rec tname s) = unfold (tsubst (RecVar tname) t s)
 unfold t = t
 
 dual :: Type m -> Type m
-dual One            = Bot
-dual Bot            = One
-dual Skip           = Skip
-dual (Seq t s)      = Seq (dual t) (dual s)
-dual (Poly d tname) = Poly (not d) tname
-dual (Var tname)    = Var tname
-dual (Rec tname t)  = Rec tname (dual t)
-dual (Par t s)      = Mul (dual t) (dual s)
-dual (Mul t s)      = Par (dual t) (dual s)
-dual (With bs)      = Plus (mapSnd (dual) bs)
-dual (Plus bs)      = With (mapSnd (dual) bs)
-dual (Put m)        = Get m
-dual (Get m)        = Put m
+dual One           = Bot
+dual Bot           = One
+dual Skip          = Skip
+dual (Seq t s)     = Seq (dual t) (dual s)
+dual (Var d tname) = Var (not d) tname
+dual (Inv tname)   = Inv tname
+dual (Rec tname t) = Rec tname (dual t)
+dual (Par t s)     = Mul (dual t) (dual s)
+dual (Mul t s)     = Par (dual t) (dual s)
+dual (With bs)     = Plus (mapSnd (dual) bs)
+dual (Plus bs)     = With (mapSnd (dual) bs)
+dual (Put m)       = Get m
+dual (Get m)       = Put m
 
 -- if s is a (possibly folded) normal form then t |> s is a (possibly folded) normal form
 (|>) :: Type m -> Type m -> Type m
-(|>) One            _ = One
-(|>) Bot            _ = Bot
-(|>) Skip           k = k
-(|>) (Seq t s)      k = t |> (s |> k)
-(|>) (Poly d tname) k = Poly d tname >>> k -- CHECK THIS, MAY OR MAY NOT REQUIRE >>> k
-(|>) (Var tname)    k = Var tname >>> k
-(|>) (Rec tname t)  k = Rec tname t >>> k
-(|>) (Par t s)      k = Par t (s |> k)
-(|>) (Mul t s)      k = Mul t (s |> k)
-(|>) (With bs)      k = With (mapSnd (|> k) bs)
-(|>) (Plus bs)      k = Plus (mapSnd (|> k) bs)
-(|>) (Put m)        k = Put m >>> k
-(|>) (Get m)        k = Get m >>> k
+(|>) One           _ = One
+(|>) Bot           _ = Bot
+(|>) Skip          k = k
+(|>) (Seq t s)     k = t |> (s |> k)
+(|>) (Var d tname) k = Var d tname >>> k
+(|>) (Inv tname)   k = Inv tname >>> k
+(|>) (Rec tname t) k = Rec tname t >>> k
+(|>) (Par t s)     k = Par t (s |> k)
+(|>) (Mul t s)     k = Mul t (s |> k)
+(|>) (With bs)     k = With (mapSnd (|> k) bs)
+(|>) (Plus bs)     k = Plus (mapSnd (|> k) bs)
+(|>) (Put m)       k = Put m >>> k
+(|>) (Get m)       k = Get m >>> k
 
 (>>>) :: Type m -> Type m -> Type m
 (>>>) t Skip = t
@@ -186,8 +186,8 @@ kind = go
         Unguarded tname -> return (Unguarded tname)
         Nullable -> return r
         Guarded -> return Guarded
-    go (Poly _ _) = return Nullable
-    go (Var tname) = return (Unguarded tname)
+    go (Var _ _) = return Nullable
+    go (Inv tname) = return (Unguarded tname)
     go (Rec tname t) = do
       k <- go t
       if k == Unguarded tname
@@ -215,8 +215,8 @@ instance MeasureVariables t => MeasureVariables (Type t) where
   mvars Bot            = Set.empty
   mvars Skip           = Set.empty
   mvars (Seq t s)      = Set.union (mvars t) (mvars s)
-  mvars (Poly _ tname) = Set.empty
-  mvars (Var tname)    = Set.empty
+  mvars (Var _ tname)  = Set.empty
+  mvars (Inv tname)    = Set.empty
   mvars (Rec tname t)  = mvars t
   mvars (Par t s)      = Set.union (mvars t) (mvars s)
   mvars (Mul t s)      = Set.union (mvars t) (mvars s)

@@ -45,10 +45,10 @@ resolveT tdefs = aux []
     aux tnames Bot  = Bot
     aux tnames Skip = Skip
     aux tnames (Seq t s) = Seq (aux tnames t) (aux tnames s)
-    aux tnames (Poly d tname) = Poly d tname
+    aux tnames (Var d tname) = Var d tname
     aux tnames (Rec tname t) = Rec tname (aux (tname : tnames) t)
-    aux tnames (Var tname) | tname `elem` tnames = Var tname
-    aux tnames (Var tname) =
+    aux tnames (Inv tname) | tname `elem` tnames = Inv tname
+    aux tnames (Inv tname) =
       case lookup tname tdefs of
         Nothing -> throw (ErrorUnknownIdentifier "type" (showWithPos tname))
         Just t  ->
