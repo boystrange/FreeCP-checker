@@ -70,6 +70,10 @@ data Type m
   | Get m -- internal use only
   deriving (Eq, Ord)
 
+data TypeE
+  = Copy TypeS
+  | Dual TypeS
+
 type TypeS = Type ()
 type TypeM = Type Measure
 
@@ -177,12 +181,11 @@ kind = go
     go Skip = return Nullable
     go (Seq t s) = do
       k <- go t
+      r <- go s
       case k of
         Unguarded tname -> return (Unguarded tname)
-        Nullable -> go s
-        Guarded -> do
-          _ <- go s
-          return Guarded
+        Nullable -> return r
+        Guarded -> return Guarded
     go (Poly _ _) = return Nullable
     go (Var tname) = return (Unguarded tname)
     go (Rec tname t) = do

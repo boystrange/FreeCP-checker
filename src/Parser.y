@@ -44,9 +44,6 @@ import Control.Exception
 %token
   TYPE      { Token _ TokenType }
   SKIP      { Token _ TokenSkip }
-  NEW       { Token _ TokenNew }
-  REC       { Token _ TokenRec }
-  IN        { Token _ TokenIn }
   CID       { $$@(Token _ (TokenCID _)) }
   LID       { $$@(Token _ (TokenLID _)) }
   INT       { $$@(Token _ (TokenINT _)) }
@@ -61,13 +58,14 @@ import Control.Exception
   '}'       { Token _ TokenRBrace }
   '['       { Token _ TokenLBrack }
   ']'       { Token _ TokenRBrack }
-  '<'       { Token _ TokenLAngle }
-  '>'       { Token _ TokenRAngle }
+  '⟨'       { Token _ TokenLAngle }
+  '⟩'       { Token _ TokenRAngle }
+  '|'       { Token _ TokenBar }
   '&'       { Token _ TokenAmp }
-  '|'       { Token _ TokenPar }
+  '⅋'       { Token _ TokenPar }
   '⊥'       { Token _ TokenBot }
-  '*'       { Token _ TokenTimes }
-  '+'       { Token _ TokenPlus }
+  '⊗'       { Token _ TokenTimes }
+  '⊕'       { Token _ TokenPlus }
   '?'       { Token _ TokenQMark }
   '!'       { Token _ TokenEMark }
   '^'       { Token _ TokenDual }
@@ -75,14 +73,12 @@ import Control.Exception
   '◃'      { Token _ TokenLTriangle }
   '↔'      { Token _ TokenLRArrow }
 
-%nonassoc '}' ']' IN
+%nonassoc '}' ']'
 
 %right ','
 %nonassoc '='
-%left '+'
 %right ';'
-%right '*' '|'
-%nonassoc '++' '--'
+%right '⊗' '⅋'
 %nonassoc '?' '!'
 %nonassoc '^'
 
@@ -120,7 +116,7 @@ ParameterNeList
   | ParameterNeList ',' ParameterNeList { $1 ++ $3 }
 
 Parameter
-  : ChannelName ':' Type { ($1, $3) }
+  : ChannelName ':' TypeExpr { ($1, $3) }
 
 -- PROCESSES
 
@@ -129,21 +125,21 @@ Process
   | ChannelName '↔' ChannelName { Link $1 $3 }
   | ChannelName '[' ']' { Close $1 }
   | ChannelName '(' ')' '.' Process { Wait $1 $5 }
-  | ChannelName '(' ChannelName ')' Process IN Process { Fork $1 $3 $5 $7 }
-  | ChannelName '<' ChannelName '>' '.' Process
+  | ChannelName '[' ChannelName ']' '(' Process '|' Process ')' { Fork $1 $3 $6 $8 }
+  | ChannelName '⟨' ChannelName '⟩' '.' Process
     { let tmp = Identifier (At $ getPos $2) "_tmp_" in
       Fork $1 tmp (Link $3 tmp) $6 }
   | ChannelName '(' ChannelName ')' '.' Process { Join $1 $3 $6 }
   | ChannelName '◃' Label '.' Process { Select $1 $3 $5 }
   | ChannelName '▹' Cases { Case $1 $3 }
   | ChannelName '▹' Label '.' Process { Case $1 [($3, $5)] }
-  | NEW '(' ChannelName ':' Type ')' Process IN Process { Cut $3 $5 $7 $9 }
+  | '(' ChannelName ':' TypeExpr ')' '(' Process '|' Process ')' { Cut $2 $4 $7 $9 }
   | ProcessName Names { Call $1 $2 }
 
 Names
   : { [] }
-  | '(' ')' { [] }
-  | '(' NameNeList ')' { $2 }
+  | '⟨' '⟩' { [] }
+  | '⟨' NameNeList '⟩' { $2 }
 
 NameNeList
   : ChannelName { [$1] }
@@ -187,18 +183,21 @@ Type
            else error $ (show $1) ++ " is not a type" }
   | '⊥'  { Bot }
   | TypeName { Var $1 }
-  | REC TypeName '.' Type { Rec $2 $4 }
   | PolyName { Poly False $1 }
   | PolyName '^' { Poly True $1 }
   | '(' Type ')' { $2 }
-  | Type '*' Type { Mul $1 $3 }
-  | Type '|' Type { Par $1 $3 }
+  | Type '⊗' Type { Mul $1 $3 }
+  | Type '⅋' Type { Par $1 $3 }
   | '!' Type { Mul $2 Skip }
   | '?' Type { Par $2 Skip }
   | SKIP { Skip }
   | Type ';' Type { Seq $1 $3 }
   | '&' Branches { With $2 }
-  | '+' Branches { Plus $2 }
+  | '⊕' Branches { Plus $2 }
+
+TypeExpr
+  : Type { Copy $1 }
+  | Type '^' { Dual $1 }
 
 Num : Int { fromIntegral $1 }
 

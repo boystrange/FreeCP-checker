@@ -32,7 +32,7 @@ instrument :: [ProcessDefS] -> [ProcessDefS]
 instrument = map goD
   where
     goD :: ProcessDefS -> ProcessDefS
-    goD (pname, xts, p) = (pname, mapSnd goT xts, goP p)
+    goD (pname, xts, p) = (pname, mapSnd goE xts, goP p)
 
     goP :: ProcessS -> ProcessS
     goP (Wait x p) = Wait x (goP p)
@@ -40,10 +40,14 @@ instrument = map goD
     goP (Join x y p) = Join x y (goP p)
     goP (Select x tag p) = Select x tag (PutGas x (goP p))
     goP (Case x bs) = Case x (mapSnd (GetGas x . goP) bs)
-    goP (Cut x t p q) = Cut x (goT t) (goP p) (goP q)
+    goP (Cut x t p q) = Cut x (goE t) (goP p) (goP q)
     goP (PutGas x p) = PutGas x (goP p)
     goP (GetGas x p) = GetGas x (goP p)
     goP p = p
+
+    goE :: TypeE -> TypeE
+    goE (Copy t) = Copy (goT t)
+    goE (Dual t) = Dual (goT t)
 
     goT :: TypeS -> TypeS
     goT (Var tname) = Var tname

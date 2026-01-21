@@ -63,27 +63,20 @@ tokens :-
   "}"     { lex' TokenRBrace      }
   "["     { lex' TokenLBrack      }
   "]"     { lex' TokenRBrack      }
-  "<"     { lex' TokenLAngle      }
   "⟨"     { lex' TokenLAngle      }
-  ">"     { lex' TokenRAngle      }
   "⟩"     { lex' TokenRAngle      }
   "="     { lex' TokenEQ          }
   "⊥"     { lex' TokenBot         }
   "&"     { lex' TokenAmp         }
   "⊕"     { lex' TokenPlus        }
-  "+"     { lex' TokenPlus        }
-  "*"     { lex' TokenTimes       }
   "⊗"     { lex' TokenTimes       }
   "⅋"     { lex' TokenPar         }
-  "|"     { lex' TokenPar         }
+  "|"     { lex' TokenBar         }
   "?"     { lex' TokenQMark       }
   "!"     { lex' TokenEMark       }
   "^"     { lex' TokenDual        }
   "▹"    { lex' TokenRTriangle   }
   "◃"    { lex' TokenLTriangle   }
-  "|>"    { lex' TokenRTriangle   }
-  "<|"    { lex' TokenLTriangle   }
-  "<->"   { lex' TokenLRArrow     }
   "↔"    { lex' TokenLRArrow     }
   @lid    { lex lookupLID         }
   @cid    { lex TokenCID          }
@@ -105,9 +98,6 @@ setFilePath = alexSetUserState . AlexUserState
 
 keywords :: [(String, TokenClass)]
 keywords = [("type",      TokenType),
-            ("rec",       TokenRec),
-            ("in",        TokenIn),
-            ("new",       TokenNew),
             ("skip",      TokenSkip)]
 
 lookupLID :: String -> TokenClass
@@ -121,9 +111,6 @@ data Token = Token AlexPosn TokenClass
 
 data TokenClass
   = TokenType
-  | TokenRec
-  | TokenNew
-  | TokenIn
   | TokenSkip
   | TokenDual
   | TokenLID String
@@ -131,6 +118,7 @@ data TokenClass
   | TokenINT Int
   | TokenFLOAT Double
   | TokenEQ
+  | TokenBar
   | TokenBot
   | TokenPlus
   | TokenTimes

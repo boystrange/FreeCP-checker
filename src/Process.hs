@@ -76,8 +76,8 @@ fn (GetGas x p) = Set.insert x (fn p)
 -- list of name declarations and an optional process body. When the
 -- body is 'Nothing' the process is declared and assumed to be well
 -- typed but is left unspecified.
-type ProcessS = Process TypeS
+type ProcessS = Process TypeE
 type ProcessM = Process TypeM
 
-type ProcessDefS = (ProcessName, [(ChannelName, TypeS)], ProcessS)
+type ProcessDefS = (ProcessName, [(ChannelName, TypeE)], ProcessS)
 type ProcessDef = (ProcessName, Measure, [(ChannelName, TypeM)], ProcessM)

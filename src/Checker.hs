@@ -209,6 +209,10 @@ annotateType = aux
 
     auxM () = MRef <$> newMeasureVar
 
+annotateExpr :: TypeE -> Checker TypeM
+annotateExpr (Copy t) = annotateType t
+annotateExpr (Dual t) = dual <$> annotateType t
+
 annotateProcess :: ProcessS -> Checker ProcessM
 annotateProcess = go
   where
@@ -239,7 +243,7 @@ annotateProcess = go
       p <- go p
       return $ GetGas x p
     go (Cut x t p q) = do
-      t <- annotateType t
+      t <- annotateExpr t
       p <- go p
       q <- go q
       return $ Cut x t p q
@@ -264,12 +268,12 @@ setProcess pname m ts = do
   let penv' = Map.insert pname (m, ts) penv
   State.put (penv', n, μ', tmap, cs')
 
-addProcess :: ProcessName -> [(ChannelName, TypeS)] -> Checker Context
+addProcess :: ProcessName -> [(ChannelName, TypeE)] -> Checker Context
 addProcess pname xts = do
   (penv, _, _, _, _) <- State.get
   unless (not (Map.member pname penv)) $ throw $ ErrorMultipleProcessDefinitions pname
   μ <- MRef <$> newMeasureVar
-  ts <- mapM (annotateType . snd) xts
+  ts <- mapM (annotateExpr . snd) xts
   setProcess pname μ ts
   return $ Map.fromList (zip (map fst xts) ts)
 
