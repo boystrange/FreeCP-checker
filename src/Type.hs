@@ -50,12 +50,10 @@ instance Enum TVar where
   toEnum = TVar
   fromEnum (TVar n) = n
 
--- |Session type representation. In addition to the forms described in the
--- paper, we also provide a 'Rec' constructor to represent recursive session
--- types explicitly in a closed form that is easier to convert into regular
--- trees.
+-- |Session type representation.
 data Type m
-  = One
+  = Void
+  | One
   | Bot
   | Skip
   | Seq (Type m) (Type m)
@@ -118,6 +116,7 @@ unfold t@(Rec tname s) = unfold (tsubst (RecVar tname) t s)
 unfold t = t
 
 dual :: Type m -> Type m
+dual Void          = Void
 dual One           = Bot
 dual Bot           = One
 dual Skip          = Skip
@@ -134,6 +133,7 @@ dual (Get m)       = Put m
 
 -- if s is a (possibly folded) normal form then t |> s is a (possibly folded) normal form
 (|>) :: Type m -> Type m -> Type m
+(|>) Void          _ = Void
 (|>) One           _ = One
 (|>) Bot           _ = Bot
 (|>) Skip          k = k
@@ -156,59 +156,25 @@ normalize :: Type m -> Type m
 normalize t = t |> Skip
 
 expose :: Type m -> Type m
+expose t | void t = Skip
 expose t = aux (normalize t)
   where
     aux t@(Rec tname s) = aux (tsubst (RecVar tname) t s)
     aux (Seq t s)       = aux t |> s
     aux t               = t
 
-wellFormed :: Type m -> Bool
-wellFormed t =
-  case kind t of
-    Just Guarded -> True
-    Just Nullable -> True
-    _ -> False
+skip :: Type m -> Bool
+skip Skip = True
+skip (Seq t s) = skip t && skip s
+skip (Rec _ t) = skip t
+skip _ = False
 
-data Kind = Nullable | Unguarded TypeName | Guarded
-  deriving (Eq, Ord)
-
-kind :: Type m -> Maybe Kind
-kind = go
-  where
-    go :: Type m -> Maybe Kind
-    go One = return Guarded
-    go Bot = return Guarded
-    go Skip = return Nullable
-    go (Seq t s) = do
-      k <- go t
-      r <- go s
-      case k of
-        Unguarded tname -> return (Unguarded tname)
-        Nullable -> return r
-        Guarded -> return Guarded
-    go (Var _ _) = return Nullable
-    go (Inv tname) = return (Unguarded tname)
-    go (Rec tname t) = do
-      k <- go t
-      if k == Unguarded tname
-        then Nothing
-        else return k
-    go (Par t s) = do
-      _ <- go t
-      _ <- go s
-      return Guarded
-    go (Mul t s) = do
-      _ <- go t
-      _ <- go s
-      return Guarded
-    go (With bs) = do
-      forM_ bs (go . snd)
-      return Guarded
-    go (Plus bs) = do
-      forM_ bs (go . snd)
-      return Guarded
-    go (Get _) = return Guarded
-    go (Put _) = return Guarded
+void :: Type m -> Bool
+void Void = True
+void (Inv _) = True
+void (Seq t s) = void t || (skip t && void s)
+void (Rec _ t) = void t
+void _ = False
 
 instance MeasureVariables t => MeasureVariables (Type t) where
   mvars One            = Set.empty

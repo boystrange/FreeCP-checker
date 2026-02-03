@@ -148,6 +148,7 @@ instance Show TVar where
 prettyType :: (m -> Document) -> Type m -> Document
 prettyType prettyMeasure = annotate (PT.colorDull PT.Cyan) . aux
   where
+    aux Void = keyword "void"
     aux One  = keyword "1"
     aux Bot  = keyword "⊥"
     aux Skip = keyword "skip"
