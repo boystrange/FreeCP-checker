@@ -376,7 +376,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       -- Remove the association for x from the context.
       (ctx, t) <- remove ctx x
       -- Make sure that the type of x is ?end
-      checkTypeEq x Type.Bot (expose t)
+      checkTypeEq x Type.Bot (normalize t)
       -- Type check the continuation.
       (p', μ) <- auxP ctx p
       return (Wait x p', μ)
@@ -387,7 +387,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       -- Make sure that the remaining context is empty.
       checkEmpty ctx
       -- Make sure that the type of x is !end
-      checkTypeEq x Type.One (expose t)
+      checkTypeEq x Type.One (normalize t)
       μ <- MRef <$> newMeasureVar
       return (Close x, msucc μ)
     -- Rule [#]
@@ -397,7 +397,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       -- Remove the association for x from the context.
       (ctx, t) <- remove ctx x
       -- Check the shape of the type of x.
-      case expose t of
+      case normalize t of
         -- If it is the input of a channel, insert the association
         -- for y in the context along with the updated type of x and
         -- type check the continuation.
@@ -414,7 +414,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       (ctx, t) <- remove ctx x
       let (ctxp, ctxq) = partitionContext ctx p q
       -- Check the shape of the type associated with x.
-      case expose t of
+      case normalize t of
         -- If it is the output of a channel...
         Type.Mul s t' -> do
           ctxp <- insert ctxp y s
@@ -428,7 +428,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
     -- Rule [⊕]
     auxP ctx (Select x tag p) = do
       (ctx, t) <- remove ctx x
-      case expose t of
+      case normalize t of
         s@(Type.Plus bs) -> do
           case lookup tag bs of
             Just sk -> do
@@ -443,7 +443,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       -- Remove the association for x from the context.
       (ctx, t) <- remove ctx x
       -- Check the shape of the type associated with x.
-      case expose t of
+      case normalize t of
         -- If it is a "with"...
         Type.With bs -> do
           let tmap = Map.fromList bs
@@ -468,7 +468,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
     -- Rule [put]
     auxP ctx (PutGas x p) = do
       (ctx, t) <- remove ctx x
-      case expose t of
+      case normalize t of
         Type.Seq (Type.Put ν) s -> do
           ctx <- insert ctx x s
           (p', μ) <- auxP ctx p
@@ -477,7 +477,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
     -- Rule [get]
     auxP ctx (GetGas x p) = do
       (ctx, t) <- remove ctx x
-      case expose t of
+      case normalize t of
         Type.Seq (Type.Get ν) s -> do
           ctx <- insert ctx x s
           (p', μ) <- auxP ctx p

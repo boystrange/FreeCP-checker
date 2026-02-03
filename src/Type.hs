@@ -133,7 +133,7 @@ dual (Get m)       = Put m
 
 -- if s is a (possibly folded) normal form then t |> s is a (possibly folded) normal form
 (|>) :: Type m -> Type m -> Type m
-(|>) Void          _ = Void
+(|>) t             _ | void t = Void
 (|>) One           _ = One
 (|>) Bot           _ = Bot
 (|>) Skip          k = k
@@ -150,14 +150,11 @@ dual (Get m)       = Put m
 
 (>>>) :: Type m -> Type m -> Type m
 (>>>) t Skip = t
+(>>>) Skip s = s
 (>>>) t s    = Seq t s
 
 normalize :: Type m -> Type m
-normalize t = t |> Skip
-
-expose :: Type m -> Type m
-expose t | void t = Void
-expose t = aux (normalize t)
+normalize t = aux (t |> Skip)
   where
     aux t@(Rec tname s) = aux (tsubst (RecVar tname) t s)
     aux (Seq t s)       = aux t |> s
