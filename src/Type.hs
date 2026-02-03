@@ -156,7 +156,7 @@ normalize :: Type m -> Type m
 normalize t = t |> Skip
 
 expose :: Type m -> Type m
-expose t | void t = Skip
+expose t | void t = Void
 expose t = aux (normalize t)
   where
     aux t@(Rec tname s) = aux (tsubst (RecVar tname) t s)
