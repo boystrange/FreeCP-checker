@@ -54,7 +54,7 @@ find t@(Var d tname) = do
   (_, _, _, tmap, _) <- State.get
   case Map.lookup tname tmap of
     Nothing -> return t
-    Just t  -> find (if d then dual t else t) 
+    Just t  -> find (if d then dual t else t)
 find t = return t
 
 instantiate :: [TypeM] -> Checker [TypeM]
@@ -66,9 +66,6 @@ instantiate ts = do
 
 addTypeConstraint :: TypeName -> TypeM -> Checker ()
 addTypeConstraint tname t = do
-  -- State.lift $ putStr $ "ADDING TYPE CONSTRAINT FOR " ++ show tname ++ " "
-  -- State.lift $ Render.printType t
-  -- State.lift $ putStrLn ""
   (pctxt, tv, mv, tmap, cs) <- State.get
   State.put (pctxt, tv, mv, Map.insert tname t tmap, cs)
 
@@ -332,6 +329,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
                         addMeasureConstraintLe ν μ
                         return (pname, μ, zip (map fst xts) ts, p')
                     ) pdefs
+      unless (contractive pdefs) $ throw $ ErrorProcessNonContractive
       (_, _, _, tmap, cs) <- State.get
       return (tmap, cs, pdefs)
 
@@ -339,14 +337,6 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
     -- channels left unused.
     checkEmpty :: Context -> Checker ()
     checkEmpty ctx = unless (Map.null ctx) $ throw $ ErrorLinearity (Map.keys ctx)
-
-    -- Return the list of session types associated with the free
-    -- names of a process name.
-    -- checkProcess :: ProcessName -> Checker (Measure, [Type])
-    -- checkProcess pname = do
-    --   case Map.lookup pname penv of
-    --     Nothing -> throw $ ErrorUnknownIdentifier "process" (showWithPos pname)
-    --     Just (m, gs) -> return (m, gs)
 
     partitionContext :: Context -> ProcessM -> ProcessM -> (Context, Context)
     partitionContext ctx p q = (pctx, qctx)
@@ -370,7 +360,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       checkEmpty ctx
       checkTypeEq x t (Type.dual s)
       μ <- MRef <$> newMeasureVar
-      return (Link x y, mzero)
+      return (Link x y, μ)
     -- Rule [⊥]
     auxP ctx (Wait x p) = do
       -- Remove the association for x from the context.
@@ -390,7 +380,7 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       checkTypeEq x Type.One (normalize t)
       μ <- MRef <$> newMeasureVar
       return (Close x, msucc μ)
-    -- Rule [#]
+    -- Rule [⅋]
     auxP ctx (Join x y p) = do
       -- If y already occurs in the context it shadows a linear name
       when (y `Map.member` ctx) $ throw $ ErrorLinearity [y]
@@ -398,9 +388,9 @@ checkTypes pdefs = State.evalStateT (checkProgram pdefs) (Map.empty, toEnum 0, t
       (ctx, t) <- remove ctx x
       -- Check the shape of the type of x.
       case normalize t of
-        -- If it is the input of a channel, insert the association
-        -- for y in the context along with the updated type of x and
-        -- type check the continuation.
+        -- If it is a par, insert the association for y in the
+        -- context along with the updated type of x and type check
+        -- the continuation.
         Type.Par s t' -> do
           ctx <- insert ctx x t'
           ctx <- insert ctx y s

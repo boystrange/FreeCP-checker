@@ -72,12 +72,25 @@ fn (Cut x _ p q) = Set.delete x (Set.union (fn p) (fn q))
 fn (PutGas x p) = Set.insert x (fn p)
 fn (GetGas x p) = Set.insert x (fn p)
 
--- | A __process definition__ is a triple made of a process name, a
--- list of name declarations and an optional process body. When the
--- body is 'Nothing' the process is declared and assumed to be well
--- typed but is left unspecified.
+-- | A __process definition__ is a quadruple made of a process name,
+-- a measure, list of name declarations and a process body.
 type ProcessS = Process TypeE
 type ProcessM = Process TypeM
 
 type ProcessDefS = (ProcessName, [(ChannelName, TypeE)], ProcessS)
 type ProcessDef = (ProcessName, Measure, [(ChannelName, TypeM)], ProcessM)
+
+contractive :: [ProcessDef] -> Bool
+contractive defs = all auxD defs
+  where
+    pmap = Map.fromList [ (pname, p) | (pname, _, _, p) <- defs ]
+
+    auxD :: ProcessDef -> Bool
+    auxD (pname, _, _, p) = auxP [pname] p
+
+    auxP :: [ProcessName] -> ProcessM -> Bool
+    auxP pnames (Call pname _) | pname `elem` pnames = False
+                               | Just p <- Map.lookup pname pmap = auxP (pname : pnames) p
+                               | otherwise = True
+    auxP pnames (Cut _ _ p q) = auxP pnames p && auxP pnames q
+    auxP pnames _ = True

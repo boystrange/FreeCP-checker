@@ -42,6 +42,7 @@ data MyException
   | ErrorSessionUnbounded ProcessName ChannelName
   | ErrorTypeUnbounded ChannelName
   | ErrorTypeNonContractive TypeM
+  | ErrorProcessNonContractive
   | ErrorTypeMismatch ChannelName String TypeM
   | ErrorArityMismatch ProcessName Int Int
   | ErrorLabelMismatch ChannelName [Label] [Label]
@@ -72,6 +73,7 @@ instance Show MyException where
   show (ErrorLabelMismatch name elabels alabels) = "labels mismatch: " ++ showWithPos name ++ ": expected " ++ show elabels ++ ", actual " ++ show alabels
   show (ErrorTypeUnbounded name) = "unbounded type: " ++ showWithPos name
   show (ErrorTypeNonContractive t) = "non-contractive type: " ++ show t
+  show ErrorProcessNonContractive = "non-contractive process definitions"
   show (ErrorRuntime msg) = "runtime error: " ++ msg
   show ErrorGeneric = "generic error"
   show (ErrorDebug msg) = "debug " ++ msg
