@@ -4,6 +4,11 @@ This is a proof-of-concept implementation of the light type system for FreeCP, a
 process calculus based on classical linear logic similar to CP that supports
 context-free session types and polymorphic process recursion.
 
+## To compile and run
+
+* Run `make` to compile the source code.
+* Run `make check` to run FreeCP against the examples.
+
 ## Source Code
 
 * [Atoms](src/Atoms.hs): basic data types for representing identifiers

@@ -1,7 +1,5 @@
 -- MIT License
 --
--- Copyright (c) 2026 Luca Padovani
---
 -- Permission is hereby granted, free of charge, to any person obtaining a copy
 -- of this software and associated documentation files (the "Software"), to deal
 -- in the Software without restriction, including without limitation the rights
@@ -115,10 +113,7 @@ flags =
 -- |The information displayed when the verbose option is specified.
 versionInfo :: String -> String
 versionInfo progName =
-  "FreeCP " ++ Data.Version.showVersion version ++ " Copyright © 2026 Luca Padovani\n"
-  ++ "License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.\n"
-  ++ "This is free software: you are free to change and redistribute it.\n"
-  ++ "There is NO WARRANTY, to the extent permitted by law."
+  "FreeCP " ++ Data.Version.showVersion version ++ " Copyright © 2026 Anonymous\n"
 
 -- |Parse command-line arguments.
 parse :: String -> [String] -> IO ([Flag], String)

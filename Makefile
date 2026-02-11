@@ -63,7 +63,7 @@ update_license:
 	for hs in `find src -name "*.hs"`; do \
 		TEMP=`mktemp`; \
 		cp LICENSE.hs $$TEMP; \
-		tail -n +22 <$$hs >>$$TEMP; \
+		tail -n +20 <$$hs >>$$TEMP; \
 		mv $$TEMP $$hs; \
 	done
 
