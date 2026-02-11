@@ -9,16 +9,28 @@ SOURCES = \
   Checker.hs \
   Common.hs \
   Exceptions.hs \
-  Formula.hs \
-  Node.hs \
-  Predicate.hs \
+  Instrumenter.hs \
+  Lexer.x \
+  Main.hs \
+  Measure.hs \
+  Parser.y \
   Process.hs \
-  Relation.hs \
   Render.hs \
   Resolver.hs \
-  Interpreter.hs \
-  Tree.hs \
+  Solver.hs \
   Type.hs \
+  $(NULL)
+EXTRA_SOURCES = \
+  ChangeLog.md \
+  errors \
+  examples \
+  FreeCP.cabal \
+  LICENSE \
+  LICENSE.hs \
+  Makefile \
+  README.md \
+  Setup.hs \
+  stack.yaml \
   $(NULL)
 
 all:
@@ -30,8 +42,8 @@ watch:
 install:
 	@$(STACK) install
 
-dist:
-	@cabal sdist
+dist: $(SOURCES:%=src/%) $(EXTRA_SOURCES) $(TESTS) $(ERRORS)
+	@tar cvfz FreeCP.tar.gz $^
 
 sync:
 	@make -C html
